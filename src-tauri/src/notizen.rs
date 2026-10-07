@@ -261,14 +261,16 @@ fn umbenennen_ohne_ueberschreiben(ordner: &Path, alt: &str, basis: &str) -> Erge
     Err("Kein freier Dateiname gefunden.".into())
 }
 
-/// Anleitung und Befehle für Claude Code (Pfad relativ zu ~/Schule, Inhalt)
-const VORLAGEN: &[(&str, &str)] = &[
-    ("CLAUDE.md", include_str!("../vorlagen/CLAUDE.md")),
-    (".claude/commands/aufbereiten.md", include_str!("../vorlagen/commands/aufbereiten.md")),
-    (".claude/commands/karten.md", include_str!("../vorlagen/commands/karten.md")),
-    (".claude/commands/luecken.md", include_str!("../vorlagen/commands/luecken.md")),
-    (".claude/commands/woche.md", include_str!("../vorlagen/commands/woche.md")),
-    (".claude/commands/korrigieren.md", include_str!("../vorlagen/commands/korrigieren.md")),
+/// Anleitung und Befehle für Claude Code: (Pfad relativ zu ~/Schule, Inhalt, bei neuer App-Version aktualisieren?)
+/// `ueber-mich.md` gehört dem Nutzer – wird nur einmal angelegt, nie aktualisiert.
+const VORLAGEN: &[(&str, &str, bool)] = &[
+    ("CLAUDE.md", include_str!("../vorlagen/CLAUDE.md"), true),
+    ("ueber-mich.md", include_str!("../vorlagen/ueber-mich.md"), false),
+    (".claude/commands/aufbereiten.md", include_str!("../vorlagen/commands/aufbereiten.md"), true),
+    (".claude/commands/karten.md", include_str!("../vorlagen/commands/karten.md"), true),
+    (".claude/commands/luecken.md", include_str!("../vorlagen/commands/luecken.md"), true),
+    (".claude/commands/woche.md", include_str!("../vorlagen/commands/woche.md"), true),
+    (".claude/commands/korrigieren.md", include_str!("../vorlagen/commands/korrigieren.md"), true),
 ];
 
 /// Hier merkt sich die App, welche Vorlagen-Fassung sie selbst geschrieben hat
@@ -295,7 +297,7 @@ fn vorlagen_anlegen(root: &Path) -> Ergebnis<()> {
         .map(|(p, h)| (p.to_string(), h.to_string()))
         .collect();
 
-    for (pfad, inhalt) in VORLAGEN {
+    for (pfad, inhalt, aktualisieren) in VORLAGEN {
         let ziel = root.join(pfad);
         if let Some(ordner) = ziel.parent() {
             fs::create_dir_all(ordner).map_err(fehler)?;
@@ -308,6 +310,7 @@ fn vorlagen_anlegen(root: &Path) -> Ergebnis<()> {
                 }
             }
             Ok(aktuell) if aktuell == *inhalt => {}
+            Ok(_) if !aktualisieren => continue,
             Ok(aktuell) => {
                 let unveraendert = protokoll.get(*pfad).is_some_and(|h| *h == pruefwert(&aktuell));
                 if !unveraendert {
@@ -644,8 +647,10 @@ mod tests {
         assert!(!ordner_liste(&root).unwrap().iter().any(|o| o.starts_with('.')));
 
         fs::write(root.join("CLAUDE.md"), "eigene Version").unwrap();
+        fs::write(root.join("ueber-mich.md"), "mein Profil").unwrap();
         schule_oeffnen(&root, &[]).unwrap();
         assert_eq!(fs::read_to_string(root.join("CLAUDE.md")).unwrap(), "eigene Version");
+        assert_eq!(fs::read_to_string(root.join("ueber-mich.md")).unwrap(), "mein Profil");
     }
 
     #[test]

@@ -7,6 +7,13 @@ genau diese Dateien – Änderungen von dir erscheinen dort sofort (Live-Sync).
 Sprich Deutsch, einfach und verständlich, mit Beispielen aus der IT-Praxis. Ziel: gut lernen und die
 IHK-Prüfungen (AP1, AP2) bestehen.
 
+## Über den Nutzer
+
+@ueber-mich.md
+
+Den Abschnitt „Lernstand“ in `ueber-mich.md` darfst du nach `/luecken` und `/korrigieren` kurz
+aktualisieren (Datum, was sitzt, was geübt werden muss). Den Rest der Datei nur auf Wunsch ändern.
+
 ## Ordner
 
 - `LF01-…` bis `LF12-…`: ein Ordner pro Lernfeld (KMK-Rahmenlehrplan FIAE 2020; LF10–12 = 10a–12a)

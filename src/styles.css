@@ -817,3 +817,123 @@ button {
   font-size: 12px;
   color: var(--text-leise);
 }
+
+/* ---------- Schritt 5: Codeblöcke mit Syntax-Farben ---------- */
+
+:root {
+  --code-schluesselwort: #a626a4;
+  --code-text: #50a14f;
+  --code-zahl: #986801;
+  --code-kommentar: #8a8f98;
+  --code-name: #4078f2;
+  --code-typ: #c18401;
+  --code-attribut: #e45649;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --code-schluesselwort: #c678dd;
+    --code-text: #98c379;
+    --code-zahl: #d19a66;
+    --code-kommentar: #7f848e;
+    --code-name: #61afef;
+    --code-typ: #e5c07b;
+    --code-attribut: #e06c75;
+  }
+}
+
+.inhalt .codeblock {
+  position: relative;
+  margin: 0.8em 0;
+}
+
+.inhalt .codeblock pre {
+  margin: 0;
+  padding-top: 14px;
+}
+
+.codeblock__kopf {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 1;
+  user-select: none;
+}
+
+.codeblock__sprache {
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-leise);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 1px 4px;
+  cursor: pointer;
+}
+
+.codeblock:hover .codeblock__sprache,
+.codeblock__sprache:focus {
+  border-color: var(--linie);
+  background: var(--bg);
+}
+
+.inhalt .hljs-keyword,
+.inhalt .hljs-selector-tag,
+.inhalt .hljs-built_in.hljs-keyword,
+.inhalt .hljs-meta .hljs-keyword {
+  color: var(--code-schluesselwort);
+}
+
+.inhalt .hljs-string,
+.inhalt .hljs-regexp,
+.inhalt .hljs-meta .hljs-string,
+.inhalt .hljs-addition {
+  color: var(--code-text);
+}
+
+.inhalt .hljs-number,
+.inhalt .hljs-literal,
+.inhalt .hljs-symbol,
+.inhalt .hljs-bullet {
+  color: var(--code-zahl);
+}
+
+.inhalt .hljs-comment,
+.inhalt .hljs-quote,
+.inhalt .hljs-meta {
+  color: var(--code-kommentar);
+  font-style: italic;
+}
+
+.inhalt .hljs-title,
+.inhalt .hljs-title.function_,
+.inhalt .hljs-section,
+.inhalt .hljs-name {
+  color: var(--code-name);
+}
+
+.inhalt .hljs-type,
+.inhalt .hljs-built_in,
+.inhalt .hljs-title.class_,
+.inhalt .hljs-class .hljs-title {
+  color: var(--code-typ);
+}
+
+.inhalt .hljs-attr,
+.inhalt .hljs-attribute,
+.inhalt .hljs-variable,
+.inhalt .hljs-template-variable,
+.inhalt .hljs-selector-id,
+.inhalt .hljs-selector-class,
+.inhalt .hljs-tag,
+.inhalt .hljs-deletion {
+  color: var(--code-attribut);
+}
+
+.inhalt .hljs-emphasis {
+  font-style: italic;
+}
+
+.inhalt .hljs-strong {
+  font-weight: 700;
+}
