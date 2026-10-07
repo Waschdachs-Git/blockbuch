@@ -13,4 +13,5 @@ Finde Lücken zu: $ARGUMENTS
    - **Lücken** – sortiert nach Prüfungsrelevanz, je 1 Satz, warum es wichtig ist
    - **Unsicher** – Stellen in den Notizen, die falsch oder unklar wirken
    - **Vorschlag**: die 3 wichtigsten nächsten Lernschritte
-4. Frage am Ende, ob du für die wichtigsten Lücken ein Lernskript als neue Notiz anlegen sollst.
+4. Frage am Ende, ob du für die wichtigsten Lücken ein Lernskript als neue Notiz anlegen sollst
+   (Format für neue Notizen: siehe `CLAUDE.md`).

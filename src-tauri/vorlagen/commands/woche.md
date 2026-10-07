@@ -5,7 +5,7 @@ argument-hint: "[Zeitraum, leer = die letzten 7 Tage]"
 
 Erstelle einen Wochenrückblick für: $ARGUMENTS (leer = die letzten 7 Tage)
 
-1. Finde alle Notizen, deren `datum` im Zeitraum liegt (alle Ordner).
+1. Finde alle Notizen, deren `datum` im Zeitraum liegt (alle Ordner außer `Gerettet/`).
 2. Antworte im Chat mit drei Teilen:
 
 **1. Berichtsheft (Berufsschule)** – zum Kopieren nach Ausbildungsheft.de: pro Lernfeld/Fach

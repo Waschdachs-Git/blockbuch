@@ -271,20 +271,56 @@ const VORLAGEN: &[(&str, &str)] = &[
     (".claude/commands/korrigieren.md", include_str!("../vorlagen/commands/korrigieren.md")),
 ];
 
-/// Legt fehlende Vorlagen an. Vorhandene Dateien bleiben unangetastet (eigene Anpassungen zählen).
+/// Hier merkt sich die App, welche Vorlagen-Fassung sie selbst geschrieben hat
+const VORLAGEN_PROTOKOLL: &str = ".claude/blockbuch-vorlagen.txt";
+
+/// Stabiler Prüfwert (FNV-1a) – erkennt, ob der Nutzer eine Vorlage verändert hat
+fn pruefwert(text: &str) -> String {
+    let mut h: u64 = 0xcbf29ce484222325;
+    for b in text.as_bytes() {
+        h ^= *b as u64;
+        h = h.wrapping_mul(0x100000001b3);
+    }
+    format!("{h:016x}")
+}
+
+/// Legt fehlende Vorlagen an und aktualisiert sie bei neuen App-Versionen –
+/// aber nur, wenn der Nutzer die Datei seit dem letzten Schreiben nicht selbst geändert hat.
 fn vorlagen_anlegen(root: &Path) -> Ergebnis<()> {
+    let protokoll_pfad = root.join(VORLAGEN_PROTOKOLL);
+    let mut protokoll: std::collections::BTreeMap<String, String> = fs::read_to_string(&protokoll_pfad)
+        .unwrap_or_default()
+        .lines()
+        .filter_map(|z| z.split_once('\t'))
+        .map(|(p, h)| (p.to_string(), h.to_string()))
+        .collect();
+
     for (pfad, inhalt) in VORLAGEN {
         let ziel = root.join(pfad);
         if let Some(ordner) = ziel.parent() {
             fs::create_dir_all(ordner).map_err(fehler)?;
         }
-        match fs::OpenOptions::new().write(true).create_new(true).open(&ziel) {
-            Ok(mut f) => f.write_all(inhalt.as_bytes()).map_err(fehler)?,
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(e) => return Err(fehler(e)),
+        match fs::read_to_string(&ziel) {
+            Err(_) => {
+                // fehlt: neu anlegen (create_new – falls sie gerade doch entsteht, nicht überschreiben)
+                if let Ok(mut f) = fs::OpenOptions::new().write(true).create_new(true).open(&ziel) {
+                    f.write_all(inhalt.as_bytes()).map_err(fehler)?;
+                }
+            }
+            Ok(aktuell) if aktuell == *inhalt => {}
+            Ok(aktuell) => {
+                let unveraendert = protokoll.get(*pfad).is_some_and(|h| *h == pruefwert(&aktuell));
+                if !unveraendert {
+                    continue; // vom Nutzer angepasst → nie überschreiben
+                }
+                schreibe_atomar(&ziel, inhalt, None)?;
+            }
         }
+        protokoll.insert(pfad.to_string(), pruefwert(inhalt));
     }
-    Ok(())
+
+    let text: String = protokoll.iter().map(|(p, h)| format!("{p}\t{h}\n")).collect();
+    fs::write(&protokoll_pfad, text).map_err(fehler)
 }
 
 pub fn schule_oeffnen(root: &Path, standard_ordner: &[String]) -> Ergebnis<Vec<String>> {
@@ -610,6 +646,30 @@ mod tests {
         fs::write(root.join("CLAUDE.md"), "eigene Version").unwrap();
         schule_oeffnen(&root, &[]).unwrap();
         assert_eq!(fs::read_to_string(root.join("CLAUDE.md")).unwrap(), "eigene Version");
+    }
+
+    #[test]
+    fn unveraenderte_alte_vorlage_wird_aktualisiert() {
+        let (_tmp, root) = testordner();
+        // so, als hätte eine ältere App-Version "alte Fassung" geschrieben und protokolliert
+        let befehl = root.join(".claude/commands/karten.md");
+        fs::write(&befehl, "alte Fassung").unwrap();
+        let protokoll = root.join(VORLAGEN_PROTOKOLL);
+        let p = fs::read_to_string(&protokoll).unwrap();
+        let p: String = p
+            .lines()
+            .map(|z| {
+                if z.starts_with(".claude/commands/karten.md\t") {
+                    format!(".claude/commands/karten.md\t{}\n", pruefwert("alte Fassung"))
+                } else {
+                    format!("{z}\n")
+                }
+            })
+            .collect();
+        fs::write(&protokoll, p).unwrap();
+
+        schule_oeffnen(&root, &[]).unwrap();
+        assert!(fs::read_to_string(&befehl).unwrap().contains("Karteikarten"));
     }
 
     #[test]

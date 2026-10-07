@@ -17,7 +17,9 @@ Die Notiz enthält Aufgaben und darunter die Antworten des Nutzers. Bewerte wie 
 > Musterlösung: …
 ```
 
-3. Am Ende der Notiz ein Claude-Kasten mit Gesamtpunktzahl, Prozent, IHK-Note
-   (100–92 = 1, unter 92–81 = 2, unter 81–67 = 3, unter 67–50 = 4, unter 50–30 = 5, darunter 6)
-   und den 2 wichtigsten Verbesserungstipps.
+   Teilpunkte nach Operator: *nennen* = 1 Punkt je richtiger Nennung; *beschreiben/erläutern* =
+   Nennung plus Erklärung/Begründung; *begründen* = Argument muss zur Aussage passen.
+3. Am Ende der Notiz ein Claude-Kasten mit Gesamtpunktzahl, Umrechnung auf 100 Punkte (ganzzahlig
+   gerundet), IHK-Note nach Punkteschlüssel (100–92 = 1, 91–81 = 2, 80–67 = 3, 66–50 = 4, 49–30 = 5,
+   29–0 = 6) und den 2 wichtigsten Verbesserungstipps.
 4. Antworte im Chat kurz mit dem Ergebnis.

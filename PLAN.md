@@ -73,9 +73,21 @@ SELECT * FROM kunde k INNER JOIN auftrag a ON k.id = a.kunde_id;
 | 9 | Git-Autosicherung + `CLAUDE.md` mit Konventionen | Claude-Änderung zurückholbar |
 | 10 | Praxistest: ein echter Blocktag | zufrieden oder Mängelliste |
 
+## Zwischenschritt – Claude-Zusammenarbeit ✅
+
+- `~/Schule/CLAUDE.md`: Regeln für Claude – Mitschrift bleibt unangetastet, Ergänzungen nur in
+  `> [!claude]`-Kästen, nur einfügen (nie ganze Datei neu schreiben)
+- Befehle für Claude Code in `~/Schule/.claude/commands/`: `/aufbereiten`, `/karten`, `/luecken`,
+  `/woche`, `/korrigieren` (Vorlagen in `src-tauri/vorlagen/`, Updates nur wenn unverändert)
+- Kästen `[!claude]`, `[!merke]`, `[!karten]`, `[!tipp]`, `[!achtung]`; Schnellmarker ⌘⇧U ❓ / ⌘⇧L 🙋
+
 ## Phase 2 – Lernen
 
-- Karteikarten mit Spaced Repetition (FSRS), Format von Anfang an handy-tauglich
+- Karteikarten mit Spaced Repetition (FSRS) – Karten stehen als `> [!karten]` direkt in der Notiz
+  (`Frage :: Antwort`), Lernstand getrennt; Anki-Export fürs Handy
+- Vorschlag: Prüfungsaufgaben im IHK-Format (Operator, Punkte, Erwartungshorizont, `/korrigieren`)
+- Vorschlag: „Aus dem Kopf erklären“ (Feynman), Rechentrainer AP1 (Subnetting, Zahlensysteme …),
+  ausführbare SQL-Blöcke, Diagramme als Text, Lernziel-Landkarte pro Lernfeld
 - Quiz aus Notizen
 - **LK-Planer**: LK eintragen → Claude findet Lücken → Tagesplan bis zur LK → passt sich an Quiz-Ergebnisse an → Probe-LK
 - Untis-Anbindung für LK-Termine (WebUntis-API; Plan B: Screenshot → Claude)
@@ -86,7 +98,7 @@ SELECT * FROM kunde k INNER JOIN auftrag a ON k.id = a.kunde_id;
 
 - Claude-Panel direkt in der App (markieren → erklären / Grafik)
 - Prüfungsmodus AP1/AP2
-- Tafelbild-Foto + OCR (Apple Vision)
+- Tafelbild-Foto: per iPhone (Continuity Camera) einfügen, Claude liest es selbst (statt eigener OCR)
 - Karteikarten auf dem Handy (eigene Mini-App oder Anki-Export)
 - Verknüpfungen `[[...]]`, Glossar
 
