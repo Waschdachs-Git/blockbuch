@@ -1,50 +1,62 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useCallback, useEffect, useRef } from "react";
+import { LERNFELDER } from "./lernfelder";
+import { Sidebar } from "./components/Sidebar";
+import { NoteList } from "./components/NoteList";
+import { EditorPane } from "./components/EditorPane";
+import { useStoredState } from "./useStoredState";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [lernfeldId, setLernfeldId] = useStoredState("blockbuch.lernfeld", LERNFELDER[0].id);
+  const [sidebarOffen, setSidebarOffen] = useStoredState("blockbuch.sidebarOffen", true);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const ersterRender = useRef(true);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const lernfeld = LERNFELDER.find((lf) => lf.id === lernfeldId) ?? LERNFELDER[0];
+
+  const toggleSidebar = useCallback(() => setSidebarOffen((offen) => !offen), [setSidebarOffen]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      // ⌥⌘S wie in Apple Notizen: Ordnerleiste ein-/ausblenden
+      if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && e.code === "KeyS") {
+        e.preventDefault();
+        if (!e.repeat) toggleSidebar();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggleSidebar]);
+
+  // Fokus nicht verlieren: Beim Einblenden ins aktive Lernfeld, beim Ausblenden auf den Umschalt-Knopf
+  useEffect(() => {
+    if (ersterRender.current) {
+      ersterRender.current = false;
+      return;
+    }
+    if (sidebarOffen) {
+      sidebarRef.current?.querySelector<HTMLButtonElement>(".ist-aktiv")?.focus();
+    } else {
+      const aktiv = document.activeElement;
+      if (!aktiv || aktiv === document.body || sidebarRef.current?.contains(aktiv)) {
+        toggleRef.current?.focus();
+      }
+    }
+  }, [sidebarOffen]);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+    <div className={`app ${sidebarOffen ? "" : "app--ohne-sidebar"}`}>
+      {/* Ausgeblendet statt ausgehängt: Scroll-Position und später geladene Ordner bleiben erhalten */}
+      <Sidebar
+        ref={sidebarRef}
+        hidden={!sidebarOffen}
+        lernfelder={LERNFELDER}
+        aktivId={lernfeld.id}
+        onAuswahl={setLernfeldId}
+      />
+      <NoteList lernfeld={lernfeld} sidebarOffen={sidebarOffen} onToggleSidebar={toggleSidebar} toggleRef={toggleRef} />
+      <EditorPane />
+    </div>
   );
 }
 
