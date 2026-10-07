@@ -69,6 +69,8 @@ export function teileInlineCode(zeile: string): string[] {
 /** Der Editor schreibt <, > und & als HTML-Codes (&lt; …). In Lernnotizen ("x > 5", "C# & Java")
  *  ist das schlecht lesbar – also normale Zeichen, und nur wo Markdown es braucht ein Backslash. */
 export function entschaerfeZeile(zeile: string): string {
+  // Kasten-Kennung am Zitatanfang ("> [!claude]") – der Editor maskiert die Klammern unnötig
+  zeile = zeile.replace(/^(\s*(?:>\s*)+)\\\[!([A-Za-z-]+)\\\]/, "$1[!$2]");
   // Nur ein als Zeichen gemeintes ">" am Zeilenanfang (&gt;) braucht "\>" – echte Zitate ("> ") nicht.
   // Auch nach Listenmarkern ("- ", "1. ", "- [ ] ") wäre ">" sonst ein Zitat.
   zeile = zeile.replace(/^(\s*(?:(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?|>\s*)*)&gt;/, "$1\\>");

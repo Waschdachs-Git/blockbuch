@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import { MARKER_FRAGEN, MARKER_UNKLAR, zaehleMarker } from "../editor/kaesten";
 import { api, fehlerText, istKonflikt } from "../api";
 import { aufraeumen, setzeZusammen, wuerdeInhaltVerlieren, zerlege, type NotizDatei } from "../editor/datei";
 import { editorErweiterungen } from "../editor/erweiterungen";
@@ -306,6 +307,13 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     externGeaendert,
   }));
 
+  // Offene Schnellmarker (❓ unklar, 🙋 Lehrkraft fragen) für die Anzeige oben
+  const marker = useEditorState({
+    editor,
+    selector: ({ editor: e }) => (e ? zaehleMarker(e.state.doc) : { unklar: 0, fragen: 0 }),
+    equalityFn: (a, b) => a?.unklar === b?.unklar && a?.fragen === b?.fragen,
+  });
+
   const statusText: Record<Status, string> = {
     gespeichert: "Gespeichert",
     ungespeichert: "Nicht gespeichert",
@@ -316,6 +324,16 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   return (
     <main className="editor">
       <div className="titelleiste" data-tauri-drag-region>
+        {datei && geladen && marker && marker.unklar + marker.fragen > 0 && (
+          <span
+            className="marker-anzeige"
+            title={`Offen: ${marker.unklar}× unklar, ${marker.fragen}× Lehrkraft fragen – mit /aufbereiten in Claude Code klären`}
+          >
+            {marker.unklar > 0 && `${MARKER_UNKLAR} ${marker.unklar}`}
+            {marker.unklar > 0 && marker.fragen > 0 && " · "}
+            {marker.fragen > 0 && `${MARKER_FRAGEN} ${marker.fragen}`}
+          </span>
+        )}
         {datei && geladen && (
           <span className={`speicherstatus speicherstatus--${vonAussen ? "aussen" : status}`} role="status">
             {vonAussen ? "Von außen aktualisiert" : statusText[status]}

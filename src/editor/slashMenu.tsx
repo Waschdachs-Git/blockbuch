@@ -2,6 +2,7 @@
 import { Extension, type Editor, type Range } from "@tiptap/core";
 import Suggestion, { exitSuggestion, type SuggestionProps, type SuggestionKeyDownProps } from "@tiptap/suggestion";
 import { useEffect, useRef } from "react";
+import { MARKER_FRAGEN, MARKER_UNKLAR } from "./kaesten";
 
 export type SlashEintrag = {
   titel: string;
@@ -32,6 +33,12 @@ export const SLASH_EINTRAEGE: SlashEintrag[] = [
     aktion: (e, r) => e.chain().focus().deleteRange(r).setCodeBlock().run() },
   { titel: "Zitat / Merksatz", hinweis: "> ", stichworte: ["zitat", "merke", "quote", "hinweis"], icon: "❝",
     aktion: (e, r) => e.chain().focus().deleteRange(r).toggleBlockquote().run() },
+  { titel: "Merke-Kasten", hinweis: "> [!merke]", stichworte: ["merke", "kasten", "wichtig"], icon: "!",
+    aktion: (e, r) => e.chain().focus().deleteRange(r).insertContent("[!merke] ").toggleBlockquote().run() },
+  { titel: "Unklar markieren", hinweis: "⌘⇧U", stichworte: ["unklar", "frage", "verstehe"], icon: MARKER_UNKLAR,
+    aktion: (e, r) => e.chain().focus().deleteRange(r).insertContent(`${MARKER_UNKLAR} `).run() },
+  { titel: "Lehrkraft fragen", hinweis: "⌘⇧L", stichworte: ["lehrkraft", "lehrer", "fragen"], icon: MARKER_FRAGEN,
+    aktion: (e, r) => e.chain().focus().deleteRange(r).insertContent(`${MARKER_FRAGEN} `).run() },
   { titel: "Trennlinie", hinweis: "---", stichworte: ["linie", "trenner", "hr"], icon: "—",
     aktion: (e, r) => e.chain().focus().deleteRange(r).setHorizontalRule().run() },
 ];

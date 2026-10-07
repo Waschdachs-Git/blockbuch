@@ -261,12 +261,39 @@ fn umbenennen_ohne_ueberschreiben(ordner: &Path, alt: &str, basis: &str) -> Erge
     Err("Kein freier Dateiname gefunden.".into())
 }
 
+/// Anleitung und Befehle für Claude Code (Pfad relativ zu ~/Schule, Inhalt)
+const VORLAGEN: &[(&str, &str)] = &[
+    ("CLAUDE.md", include_str!("../vorlagen/CLAUDE.md")),
+    (".claude/commands/aufbereiten.md", include_str!("../vorlagen/commands/aufbereiten.md")),
+    (".claude/commands/karten.md", include_str!("../vorlagen/commands/karten.md")),
+    (".claude/commands/luecken.md", include_str!("../vorlagen/commands/luecken.md")),
+    (".claude/commands/woche.md", include_str!("../vorlagen/commands/woche.md")),
+    (".claude/commands/korrigieren.md", include_str!("../vorlagen/commands/korrigieren.md")),
+];
+
+/// Legt fehlende Vorlagen an. Vorhandene Dateien bleiben unangetastet (eigene Anpassungen zählen).
+fn vorlagen_anlegen(root: &Path) -> Ergebnis<()> {
+    for (pfad, inhalt) in VORLAGEN {
+        let ziel = root.join(pfad);
+        if let Some(ordner) = ziel.parent() {
+            fs::create_dir_all(ordner).map_err(fehler)?;
+        }
+        match fs::OpenOptions::new().write(true).create_new(true).open(&ziel) {
+            Ok(mut f) => f.write_all(inhalt.as_bytes()).map_err(fehler)?,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(fehler(e)),
+        }
+    }
+    Ok(())
+}
+
 pub fn schule_oeffnen(root: &Path, standard_ordner: &[String]) -> Ergebnis<Vec<String>> {
     fs::create_dir_all(root).map_err(fehler)?;
     for name in standard_ordner {
         pruefe_name(name)?;
         fs::create_dir_all(root.join(name)).map_err(fehler)?;
     }
+    vorlagen_anlegen(root)?;
     ordner_liste(root)
 }
 
@@ -570,6 +597,19 @@ mod tests {
         fs::remove_file(root.join("LF05-Daten").join(&n.datei)).unwrap();
         assert!(notiz_speichern(&root, "LF05-Daten", &n.datei, "x", Some(neu)).is_err());
         assert!(!root.join("LF05-Daten").join(&n.datei).exists());
+    }
+
+    #[test]
+    fn vorlagen_werden_angelegt_aber_nie_ueberschrieben() {
+        let (_tmp, root) = testordner();
+        assert!(root.join("CLAUDE.md").exists());
+        assert!(root.join(".claude/commands/aufbereiten.md").exists());
+        // Vorlagen-Ordner tauchen nicht als Notizordner auf
+        assert!(!ordner_liste(&root).unwrap().iter().any(|o| o.starts_with('.')));
+
+        fs::write(root.join("CLAUDE.md"), "eigene Version").unwrap();
+        schule_oeffnen(&root, &[]).unwrap();
+        assert_eq!(fs::read_to_string(root.join("CLAUDE.md")).unwrap(), "eigene Version");
     }
 
     #[test]

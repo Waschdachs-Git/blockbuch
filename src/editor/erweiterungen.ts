@@ -7,6 +7,7 @@ import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
 import Image from "@tiptap/extension-image";
 import { SichererCodeBlock } from "./codeBlock";
+import { Kaesten } from "./kaesten";
 
 export function editorErweiterungen(): Extensions {
   return [
@@ -21,5 +22,6 @@ export function editorErweiterungen(): Extensions {
       placeholder: ({ node }) => (node.type.name === "heading" ? "Überschrift" : "Schreib los … oder tippe / für Blöcke"),
     }),
     Markdown.configure({ indentation: { style: "space", size: 2 } }),
+    Kaesten,
   ];
 }

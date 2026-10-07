@@ -33,6 +33,10 @@ describe("Rundreise Laden → Speichern", () => {
     "```cpp\nif (a < b && c > d) {}\n```",
     "![Bild](assets/x.png)",
     "Text  \nmit Umbruch",
+    "> [!claude]\n> Erklärung von Claude.\n> Zweite Zeile.",
+    "> [!merke] Kurz\n> **Wichtig**",
+    "> [!karten]\n> Was ist ein Join? :: Verknüpfung von Tabellen",
+    "Ein Satz ❓ und 🙋 Frage",
   ];
   for (const md of unveraendert) {
     it(`bleibt gleich: ${JSON.stringify(md.slice(0, 40))}`, () => {
