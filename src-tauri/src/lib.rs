@@ -18,6 +18,24 @@ static BEENDEN_ERLAUBT: AtomicBool = AtomicBool::new(false);
 /// Ereignis an die Oberfläche: "Bitte jetzt alles sichern, dann `beenden` aufrufen"
 const BEENDEN_ANGEFRAGT: &str = "beenden-angefragt";
 
+/// Erlaubte Ziele: die App selbst, Grafiken (grafik://), leere Rahmen – sonst nichts.
+/// `entwicklung`: im Entwicklungsmodus läuft die Oberfläche auf http://localhost:1420.
+fn navigation_erlaubt_fuer(url: &tauri::Url, entwicklung: bool) -> bool {
+    match url.scheme() {
+        "tauri" | "grafik" | "about" | "blob" | "data" => true,
+        "http" | "https" => match url.host_str() {
+            Some("tauri.localhost" | "grafik.localhost") => true,
+            Some("localhost") => entwicklung,
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn navigation_erlaubt(url: &tauri::Url) -> bool {
+    navigation_erlaubt_fuer(url, cfg!(dev))
+}
+
 fn beenden_anfragen(app: &tauri::AppHandle) {
     eprintln!("[blockbuch] Beenden angefragt – Oberfläche sichert");
     let _ = app.emit(BEENDEN_ANGEFRAGT, ());
@@ -124,6 +142,12 @@ async fn notiz_loeschen(app: tauri::AppHandle, ordner: String, datei: String) ->
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // Navigationsschutz: weder App noch Grafik-Rahmen dürfen zu fremden Seiten wechseln
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry>::new("navigationsschutz")
+                .on_navigation(|_webview, url| navigation_erlaubt(url))
+                .build(),
+        )
         // Animierte Grafiken aus <Ordner>/assets/ – abgeschottet, siehe grafik.rs
         .register_uri_scheme_protocol(grafik::SCHEMA, |ctx, request| match schule_pfad(ctx.app_handle()) {
             Ok(root) => grafik::http_antwort(&root, &request),
@@ -182,13 +206,32 @@ pub fn run() {
                 .paste()
                 .select_all()
                 .build()?;
+            // Ablage/Darstellung als echte Menüpunkte: Kürzel wirken auch, wenn eine Grafik den Fokus hat
+            let ablage = SubmenuBuilder::new(h, "Ablage")
+                .item(&MenuItemBuilder::with_id("neue-notiz", "Neue Notiz").accelerator("CmdOrCtrl+N").build(h)?)
+                .build()?;
+            let darstellung = SubmenuBuilder::new(h, "Darstellung")
+                .item(
+                    &MenuItemBuilder::with_id("ordner-leiste", "Ordner-Leiste ein-/ausblenden")
+                        .accelerator("CmdOrCtrl+Alt+S")
+                        .build(h)?,
+                )
+                .build()?;
             let fenster = SubmenuBuilder::new(h, "Fenster").minimize().close_window().build()?;
-            app.set_menu(MenuBuilder::new(h).items(&[&app_menue, &bearbeiten, &fenster]).build()?)?;
+            app.set_menu(
+                MenuBuilder::new(h)
+                    .items(&[&app_menue, &ablage, &bearbeiten, &darstellung, &fenster])
+                    .build()?,
+            )?;
             Ok(())
         })
         .on_menu_event(|app, ereignis| {
-            if ereignis.id() == "beenden" {
-                beenden_anfragen(app);
+            match ereignis.id().as_ref() {
+                "beenden" => beenden_anfragen(app),
+                // alle anderen Menüpunkte erledigt die Oberfläche
+                id => {
+                    let _ = app.emit("menue", id);
+                }
             }
         })
         // Fenster schließen (roter Knopf, ⌘W): erst sichern lassen
@@ -211,4 +254,22 @@ pub fn run() {
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::navigation_erlaubt_fuer as erlaubt;
+
+    #[test]
+    fn navigation_nur_zur_app_und_zu_grafiken() {
+        let u = |s: &str| tauri::Url::parse(s).unwrap();
+        assert!(erlaubt(&u("tauri://localhost/"), false));
+        assert!(erlaubt(&u("grafik://localhost/LF05/assets/a.html"), false));
+        assert!(erlaubt(&u("about:blank"), false));
+        assert!(erlaubt(&u("http://localhost:1420/"), true));
+        assert!(!erlaubt(&u("http://localhost:1420/"), false));
+        assert!(!erlaubt(&u("https://boese.example/?daten=geheim"), true));
+        assert!(!erlaubt(&u("file:///Users/x/Schule/LF05/notiz.md"), true));
+        assert!(!erlaubt(&u("https://localhost.boese.example/"), true));
+    }
 }

@@ -3,8 +3,8 @@
 //
 // Sicherheit – eine Grafik ist ein kleines Programm, darum mehrfach abgeschottet:
 //  1. Nur Dateien aus <Ordner>/assets/ in ~/Schule, keine Pfadtricks (.., Symlinks nach außen).
-//  2. Strenge CSP: kein Netzwerkzugriff (connect-src 'none'), keine Formulare, keine Rahmen.
-//     Nur Skript-Bibliotheken von bekannten CDNs sind erlaubt (falls Claude eine braucht).
+//  2. Strenge CSP: kein Netzwerk – auch keine CDNs/Webfonts (offline im Unterricht, kein Weg nach außen).
+//     Bibliotheken müssen als Datei im selben assets/-Ordner liegen.
 //  3. Der Rahmen in der App ist sandboxed (eigener Ursprung) und bekommt keine App-Befehle –
 //     Tauri gibt den nötigen Schlüssel nur dem Hauptfenster.
 
@@ -13,9 +13,9 @@ use std::path::Path;
 pub const SCHEMA: &str = "grafik";
 
 const CSP: &str = "default-src 'none'; \
-    script-src 'unsafe-inline' 'unsafe-eval' grafik: http://grafik.localhost https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com; \
-    style-src 'unsafe-inline' grafik: http://grafik.localhost https://fonts.googleapis.com; \
-    font-src data: https://fonts.gstatic.com; \
+    script-src 'unsafe-inline' 'unsafe-eval' grafik: http://grafik.localhost; \
+    style-src 'unsafe-inline' grafik: http://grafik.localhost; \
+    font-src data: grafik: http://grafik.localhost; \
     img-src data: blob: grafik: http://grafik.localhost; \
     media-src data: blob: grafik: http://grafik.localhost; \
     connect-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'";
@@ -54,30 +54,37 @@ fn fehlerseite(status: u16, text: &str) -> Antwort {
 
 /// `pfad` ist der (URL-kodierte) Pfad hinter dem Host, z. B. "/LF05%2Fassets%2Fjoin.html"
 pub fn antwort(root: &Path, pfad: &str) -> Antwort {
-    let pfad = percent_encoding::percent_decode_str(pfad.trim_start_matches('/')).decode_utf8_lossy();
-    // Abfrageteil (?v=3, zum Neuladen) ignorieren
-    let pfad = pfad.split('?').next().unwrap_or_default();
-    let teile: Vec<&str> = pfad.split('/').filter(|t| !t.is_empty()).collect();
+    // Segmente einzeln dekodieren (ein kodierter Schrägstrich %2F im Namen bleibt so ein Zeichen)
+    let teile: Vec<String> = pfad
+        .split('/')
+        .filter(|t| !t.is_empty())
+        .map(|t| percent_encoding::percent_decode_str(t).decode_utf8_lossy().into_owned())
+        .collect();
+    let teile: Vec<&str> = teile.iter().map(String::as_str).collect();
 
     let [ordner, "assets", datei] = teile.as_slice() else {
         return fehlerseite(404, "Grafiken müssen im Ordner assets/ liegen.");
     };
-    let gueltig = |t: &str| !t.starts_with('.') && !t.contains(['\\', '\0', ':']);
+    let gueltig = |t: &str| !t.starts_with('.') && !t.contains(['/', '\\', '\0', ':']);
     if !gueltig(ordner) || !gueltig(datei) {
         return fehlerseite(400, "Ungültiger Pfad.");
     }
-    let Some(typ) = typ_fuer(datei) else {
+    // Unerlaubte Typen gar nicht erst auf der Platte suchen
+    if typ_fuer(datei).is_none() {
         return fehlerseite(415, "Dieser Dateityp wird nicht angezeigt.");
-    };
-
-    let ziel = root.join(ordner).join("assets").join(datei);
-    // Symlinks dürfen nicht aus ~/Schule herausführen
-    let (Ok(echt), Ok(echt_root)) = (ziel.canonicalize(), root.canonicalize()) else {
+    }
+    let assets = root.join(ordner).join("assets");
+    // Symlinks dürfen nicht aus diesem assets/-Ordner herausführen (z. B. auf eine Notiz)
+    let (Ok(echt), Ok(echt_assets)) = (assets.join(datei).canonicalize(), assets.canonicalize()) else {
         return fehlerseite(404, &format!("Grafik nicht gefunden: {ordner}/assets/{datei}"));
     };
-    if !echt.starts_with(&echt_root) {
+    if !echt.starts_with(&echt_assets) {
         return fehlerseite(403, "Zugriff verweigert.");
     }
+    // Dateityp vom echten Ziel, nicht vom angefragten Namen
+    let Some(typ) = echt.file_name().and_then(|n| n.to_str()).and_then(typ_fuer) else {
+        return fehlerseite(415, "Dieser Dateityp wird nicht angezeigt.");
+    };
     match std::fs::read(&echt) {
         Ok(inhalt) => Antwort { status: 200, typ, inhalt },
         Err(_) => fehlerseite(404, &format!("Grafik nicht gefunden: {ordner}/assets/{datei}")),
@@ -114,21 +121,27 @@ mod tests {
     #[test]
     fn liefert_grafik_aus_assets() {
         let (_t, root) = schule();
-        let a = antwort(&root, "/LF05%2Fassets%2Fjoin.html");
+        let a = antwort(&root, "/LF05/assets/join.html");
         assert_eq!(a.status, 200);
         assert_eq!(a.inhalt, b"<p>Join</p>");
         assert!(a.typ.starts_with("text/html"));
-        assert_eq!(antwort(&root, "/LF05/assets/join.html?v=3").status, 200);
+        // Umlaute/Leerzeichen im Namen (kodiert)
+        fs::write(root.join("LF05/assets/Größe über.html"), "x").unwrap();
+        assert_eq!(antwort(&root, "/LF05/assets/Gr%C3%B6%C3%9Fe%20%C3%BCber.html").status, 200);
+        // Ganzer Pfad in einem kodierten Segment gilt nicht
+        assert_eq!(antwort(&root, "/LF05%2Fassets%2Fjoin.html").status, 404);
     }
 
     #[test]
     fn nichts_ausserhalb_von_assets() {
         let (_t, root) = schule();
         assert_eq!(antwort(&root, "/LF05/geheim.md").status, 404);
-        assert_eq!(antwort(&root, "/LF05/assets/..%2F..%2Fgeheim.md").status, 404);
+        assert_eq!(antwort(&root, "/LF05/assets/..%2F..%2Fgeheim.md").status, 400);
         assert_eq!(antwort(&root, "/..%2FLF05%2Fassets%2Fjoin.html").status, 404);
         assert_eq!(antwort(&root, "/LF05/assets/.versteckt.html").status, 400);
         assert_eq!(antwort(&root, "/LF05/assets/fehlt.html").status, 404);
+        assert_eq!(antwort(&root, "/LF05/assets/..%2Fgeheim.md").status, 400);
+        assert_eq!(antwort(&root, "/LF05%252Fassets%252Fjoin.html").status, 404);
         assert_eq!(antwort(&root, "/LF05/assets/programm.exe").status, 415);
     }
 
@@ -139,5 +152,8 @@ mod tests {
         fs::write(t.path().join("draussen.html"), "geheim").unwrap();
         std::os::unix::fs::symlink(t.path().join("draussen.html"), root.join("LF05/assets/link.html")).unwrap();
         assert_eq!(antwort(&root, "/LF05/assets/link.html").status, 403);
+        // Symlink in assets/ auf eine Notiz im selben Lernfeld
+        std::os::unix::fs::symlink(root.join("LF05/geheim.md"), root.join("LF05/assets/notiz.html")).unwrap();
+        assert_eq!(antwort(&root, "/LF05/assets/notiz.html").status, 403);
     }
 }

@@ -220,7 +220,25 @@ function App() {
 
   const toggleSidebar = useCallback(() => setSidebarOffen((offen) => !offen), [setSidebarOffen]);
 
+  // Menüpunkte aus der Mac-Menüleiste (⌘N, ⌥⌘S) – wirken auch, wenn eine Grafik den Fokus hat
+  const menueRef = useRef<(id: string) => void>(() => {});
+  menueRef.current = (id) => {
+    if (id === "neue-notiz") neueNotiz();
+    if (id === "ordner-leiste") toggleSidebar();
+  };
   useEffect(() => {
+    let aktiv = true;
+    let abmelden: (() => void) | undefined;
+    listen<string>("menue", (e) => menueRef.current(e.payload)).then((f) => (aktiv ? (abmelden = f) : f()));
+    return () => {
+      aktiv = false;
+      abmelden?.();
+    };
+  }, []);
+
+  // Nur in der Browser-Simulation (ohne Mac-Menü) die Kürzel selbst abfangen
+  useEffect(() => {
+    if (!("__blockbuchSimulation" in window)) return;
     function onKeyDown(e: KeyboardEvent) {
       if (!e.metaKey || e.ctrlKey) return;
       // ⌥⌘S wie in Apple Notizen: Ordnerleiste ein-/ausblenden

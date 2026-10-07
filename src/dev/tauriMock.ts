@@ -123,6 +123,8 @@ window.__TAURI_INTERNALS__ = {
 };
 // für listen()/unlisten() aus @tauri-apps/api/event
 (window as unknown as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+// Kennzeichen: läuft in der Browser-Simulation (App fängt dann ⌘N/⌥⌘S selbst ab, es gibt kein Mac-Menü)
+(window as unknown as Record<string, unknown>).__blockbuchSimulation = true;
 // Für Tests im Browser einsehbar
 // @ts-expect-error – Debug-Zugriff
 window.__blockbuchFs = fs;

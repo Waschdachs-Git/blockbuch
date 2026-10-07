@@ -1021,3 +1021,50 @@ button {
 .grafik.ist-vollbild .grafik__quelle {
   display: none;
 }
+
+.grafik__start {
+  display: grid;
+  place-items: center;
+  height: 140px;
+  background: repeating-linear-gradient(135deg, transparent 0 12px, var(--bg-hover) 12px 24px);
+}
+
+.grafik__start-knopf {
+  padding: 8px 16px;
+  border: 1px solid var(--linie);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.grafik__start-knopf:hover:not(:disabled) {
+  border-color: var(--akzent);
+  color: var(--akzent);
+}
+
+.grafik__start-knopf:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.grafik__start[hidden],
+.grafik__rahmen[hidden] {
+  display: none;
+}
+
+/* "Schließen" nur im Vollbild */
+.grafik__schliessen {
+  display: none;
+}
+
+.grafik.ist-vollbild .grafik__schliessen {
+  display: inline-block;
+  font-weight: 600;
+  color: var(--text);
+  border: 1px solid var(--linie);
+  background: var(--bg);
+}

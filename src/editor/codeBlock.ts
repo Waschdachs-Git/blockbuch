@@ -71,7 +71,7 @@ export const SichererCodeBlock = CodeBlockLowlight.extend({
   addNodeView() {
     return ({ node, editor, getPos }) => {
       // ```grafik zeigt eine lebendige Grafik statt Code
-      if (node.attrs.language === "grafik") return grafikNodeView(node, editor);
+      if (node.attrs.language === "grafik") return grafikNodeView(node, editor, getPos);
       let aktuell: PMNode = node;
       const dom = document.createElement("div");
       dom.className = "codeblock";

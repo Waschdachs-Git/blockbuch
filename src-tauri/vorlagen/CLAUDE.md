@@ -80,17 +80,20 @@ interaktive Animation erklären.
 
 Regeln für die HTML-Datei (die App zeigt sie abgeschottet an):
 
-- **Alles in einer Datei**: CSS und JavaScript inline. Am besten ohne Bibliotheken (SVG, Canvas,
-  CSS-Animationen). Falls nötig: nur von `cdn.jsdelivr.net`, `cdnjs.cloudflare.com` oder `unpkg.com`.
-- **Kein Netzwerk**: kein `fetch`, keine Formulare, keine externen Bilder (nur `data:`-URLs oder Dateien
-  aus demselben `assets/`-Ordner). Es muss offline im Unterricht funktionieren.
+- **Alles in einer Datei**: CSS und JavaScript inline, ohne Bibliotheken (SVG, Canvas,
+  CSS-Animationen reichen fast immer). Hilfsdateien (Bilder, ein Skript) nur aus demselben `assets/`-Ordner,
+  relativ eingebunden (`<img src="bild.png">`).
+- **Kein Netzwerk** – die App blockiert es: keine CDNs, keine Webfonts, kein `fetch`, keine Formulare,
+  keine externen Links. Es muss offline im Unterricht funktionieren.
+- **Keine Endlosschleifen** und nichts, was viel Rechenzeit braucht: Die Grafik läuft im selben Fenster
+  wie der Editor. (Sie startet erst, wenn der Nutzer auf „▶ Grafik starten“ klickt.)
 - **Breite 100 %**, die Höhe passt zu `höhe:` (120–2000 px). Auch bei schmaler Breite (~500 px) lesbar.
 - **Hell und dunkel**: Farben über CSS-Variablen, dunkle Variante per `@media (prefers-color-scheme: dark)`,
   `body` mit eigener Hintergrundfarbe. Systemschrift (`-apple-system, sans-serif`).
 - **Zum Lernen gebaut**: Knöpfe ▶ Abspielen / ❚❚ Pause / Schritt → / ↺; ruhiges Tempo (ca. 1,5–2 s pro
   Schritt); zu jedem Schritt ein kurzer Erklärtext auf Deutsch; Fachbegriffe wie in der Prüfung.
 - `prefers-reduced-motion` beachten. Keine automatisch startenden Endlos-Animationen.
-- Überarbeiten: einfach die HTML-Datei ändern – die App lädt die Grafik sofort neu.
+- Überarbeiten: einfach die HTML-Datei ändern – die App zeigt „Grafik wurde geändert – neu starten“.
 
 ## Schnellmarker aus dem Unterricht
 
