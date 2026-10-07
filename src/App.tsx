@@ -5,6 +5,7 @@ import { Sidebar } from "./components/Sidebar";
 import { NoteList } from "./components/NoteList";
 import { EditorPane, type EditorHandle } from "./components/EditorPane";
 import { useStoredState } from "./useStoredState";
+import { ASSETS_GEAENDERT } from "./editor/grafikBlock";
 import { api, fehlerText, heute, type Aenderung, type NotizInfo } from "./api";
 
 function App() {
@@ -69,6 +70,10 @@ function App() {
     const imOrdner = aenderungen.filter((a) => gleich(a.ordner, ordnerName));
     if (ordnerName && (alles || imOrdner.length > 0)) {
       ladeNotizen(ordnerName).catch(melde);
+      // Änderungen in assets/ (z. B. Claude überarbeitet eine Grafik): Grafiken neu laden
+      if (alles || imOrdner.some((a) => a.datei === null)) {
+        window.dispatchEvent(new CustomEvent(ASSETS_GEAENDERT, { detail: ordnerName }));
+      }
       if (alles || imOrdner.some((a) => a.datei === null || gleich(a.datei, aktiveDateiRef.current))) {
         editorRef.current?.externGeaendert();
       }

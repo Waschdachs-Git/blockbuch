@@ -937,3 +937,87 @@ button {
 .inhalt .hljs-strong {
   font-weight: 700;
 }
+
+/* ---------- Schritt 6: animierte Grafiken ---------- */
+
+.inhalt .grafik {
+  margin: 1em 0;
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.grafik__leiste {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 6px 4px 12px;
+  border-bottom: 1px solid var(--linie);
+  background: var(--code-bg);
+  font-size: 11px;
+  color: var(--text-leise);
+  user-select: none;
+}
+
+.grafik__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grafik__knopf {
+  min-width: 26px;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-leise);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.grafik__knopf:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.grafik__rahmen {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.inhalt .grafik__quelle {
+  margin: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--linie);
+}
+
+/* Vollbild: Grafik über die ganze App */
+.inhalt .grafik.ist-vollbild {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  margin: 0;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.grafik.ist-vollbild .grafik__leiste {
+  padding-left: 84px; /* Platz für die Fenster-Ampel */
+  height: var(--titelleiste-hoehe);
+}
+
+.grafik.ist-vollbild .grafik__rahmen {
+  flex: 1;
+  height: auto !important;
+}
+
+.grafik.ist-vollbild .grafik__quelle {
+  display: none;
+}

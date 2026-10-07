@@ -58,6 +58,7 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
       return ordner();
     case "notizen_auflisten":
       return Object.entries(fs[a.ordner] ?? {})
+        .filter(([d]) => d.endsWith(".md") && !d.includes("/"))
         .map(([d, c]) => info(d, c))
         .sort((x, y) => y.datum.localeCompare(x.datum));
     case "notiz_lesen":
@@ -108,7 +109,18 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
 }
 
 // @ts-expect-error – interne Tauri-Schnittstelle, die @tauri-apps/api aufruft
-window.__TAURI_INTERNALS__ = { invoke, transformCallback };
+window.__TAURI_INTERNALS__ = {
+  invoke,
+  transformCallback,
+  // grafik://-Dateien: in der Simulation als Blob-URL aus dem Speicher (Schlüssel "assets/…" im Ordner)
+  convertFileSrc: (pfad: string) => {
+    const [ordner, ...rest] = pfad.split("/");
+    const inhalt = fs[ordner]?.[rest.join("/")];
+    return inhalt === undefined
+      ? "data:text/html,<p style='font:14px sans-serif;color:%23888'>Grafik nicht gefunden</p>"
+      : URL.createObjectURL(new Blob([inhalt], { type: "text/html" }));
+  },
+};
 // für listen()/unlisten() aus @tauri-apps/api/event
 (window as unknown as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
 // Für Tests im Browser einsehbar

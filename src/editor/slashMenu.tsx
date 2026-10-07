@@ -31,6 +31,13 @@ export const SLASH_EINTRAEGE: SlashEintrag[] = [
     aktion: (e, r) => e.chain().focus().deleteRange(r).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
   { titel: "Code", hinweis: "```", stichworte: ["code", "programm", "java", "sql", "python", "csharp"], icon: "</>",
     aktion: (e, r) => e.chain().focus().deleteRange(r).setCodeBlock().run() },
+  { titel: "Animierte Grafik", hinweis: "```grafik", stichworte: ["grafik", "animation", "bild", "diagramm"], icon: "✦",
+    aktion: (e, r) =>
+      e.chain().focus().deleteRange(r).insertContent({
+        type: "codeBlock",
+        attrs: { language: "grafik" },
+        content: [{ type: "text", text: "src: assets/\nhöhe: 360" }],
+      }).run() },
   { titel: "Zitat / Merksatz", hinweis: "> ", stichworte: ["zitat", "merke", "quote", "hinweis"], icon: "❝",
     aktion: (e, r) => e.chain().focus().deleteRange(r).toggleBlockquote().run() },
   { titel: "Merke-Kasten", hinweis: "> [!merke]", stichworte: ["merke", "kasten", "wichtig"], icon: "!",

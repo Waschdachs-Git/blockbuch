@@ -284,6 +284,7 @@ name = "blockbuch"
 version = "0.1.0"
 dependencies = [
  "notify-debouncer-mini",
+ "percent-encoding",
  "serde",
  "serde_json",
  "tauri",

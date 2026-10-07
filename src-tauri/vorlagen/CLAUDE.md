@@ -61,6 +61,37 @@ Ergänzungen schreibst du **nur in Claude-Kästen**:
   Code nur als `Inline`). Neue Karten **an den vorhandenen** Karten-Kasten anhängen. Der Karten-Kasten
   steht immer **am Ende** der Notiz (nach „Kurz zusammengefasst“).
 
+## Animierte Grafiken
+
+Die App kann **lebendige Grafiken** direkt in einer Notiz zeigen – das ist eine Stärke von dir:
+Abläufe (JOIN, Subnetting, Sortierverfahren, TCP-Handshake, OSI-Modell, Zustandsautomaten …) als
+interaktive Animation erklären.
+
+1. Schreibe eine **eigenständige HTML-Datei** nach `<Ordner der Notiz>/assets/<name>.html`
+   (Name klein, mit Bindestrichen, z. B. `assets/tcp-handshake.html`).
+2. Füge in die Notiz (nach der passenden Stelle, nie mitten in eine Liste) diesen Block ein:
+
+   ````markdown
+   ```grafik
+   src: assets/tcp-handshake.html
+   höhe: 400
+   ```
+   ````
+
+Regeln für die HTML-Datei (die App zeigt sie abgeschottet an):
+
+- **Alles in einer Datei**: CSS und JavaScript inline. Am besten ohne Bibliotheken (SVG, Canvas,
+  CSS-Animationen). Falls nötig: nur von `cdn.jsdelivr.net`, `cdnjs.cloudflare.com` oder `unpkg.com`.
+- **Kein Netzwerk**: kein `fetch`, keine Formulare, keine externen Bilder (nur `data:`-URLs oder Dateien
+  aus demselben `assets/`-Ordner). Es muss offline im Unterricht funktionieren.
+- **Breite 100 %**, die Höhe passt zu `höhe:` (120–2000 px). Auch bei schmaler Breite (~500 px) lesbar.
+- **Hell und dunkel**: Farben über CSS-Variablen, dunkle Variante per `@media (prefers-color-scheme: dark)`,
+  `body` mit eigener Hintergrundfarbe. Systemschrift (`-apple-system, sans-serif`).
+- **Zum Lernen gebaut**: Knöpfe ▶ Abspielen / ❚❚ Pause / Schritt → / ↺; ruhiges Tempo (ca. 1,5–2 s pro
+  Schritt); zu jedem Schritt ein kurzer Erklärtext auf Deutsch; Fachbegriffe wie in der Prüfung.
+- `prefers-reduced-motion` beachten. Keine automatisch startenden Endlos-Animationen.
+- Überarbeiten: einfach die HTML-Datei ändern – die App lädt die Grafik sofort neu.
+
 ## Schnellmarker aus dem Unterricht
 
 - `❓` = hier hat der Nutzer etwas nicht verstanden → beim Aufbereiten erklären, dann `❓` → `✅`.
@@ -95,7 +126,7 @@ Text …
 
 Überschriften (`#`), Absätze, **fett**, *kursiv*, ~~durchgestrichen~~, `Code`, Links, Listen,
 nummerierte Listen, Checklisten (`- [ ]`), Tabellen, Codeblöcke mit Sprache (```` ```sql ````),
-Zitate/Kästen, Trennlinien, Bilder (`![Beschreibung](assets/datei.png)`).
+Zitate/Kästen, Trennlinien, Bilder (`![Beschreibung](assets/datei.png)`), Grafik-Blöcke (```` ```grafik ````).
 
 **Nicht verwenden:** HTML (`<details>`, `<br>` …), Fußnoten, Unterstreichen, `===`-Überschriften.
 Notizen mit HTML öffnet die App nur schreibgeschützt.

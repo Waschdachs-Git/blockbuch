@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { MARKER_FRAGEN, MARKER_UNKLAR, zaehleMarker } from "../editor/kaesten";
+import { setzeGrafikOrdner } from "../editor/grafikBlock";
 import { api, fehlerText, istKonflikt } from "../api";
 import { aufraeumen, setzeZusammen, wuerdeInhaltVerlieren, zerlege, type NotizDatei } from "../editor/datei";
 import { editorErweiterungen } from "../editor/erweiterungen";
@@ -172,6 +173,8 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   /** Inhalt in den Editor setzen, OHNE Eintrag im Rückgängig-Verlauf – sonst holt ⌘Z den alten
    *  Stand (oder die vorige Notiz) zurück und das Autosave überschreibt damit die Datei. */
   function inhaltSetzen(text: string) {
+    // Grafiken laden ihre Dateien aus dem assets/-Ordner der offenen Notiz
+    if (geoeffnet.current) setzeGrafikOrdner(geoeffnet.current.ordner);
     editor
       ?.chain()
       .command(({ tr }) => {

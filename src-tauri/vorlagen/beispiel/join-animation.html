@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>INNER JOIN vs. LEFT JOIN</title>
+<style>
+  :root {
+    --bg: #ffffff; --text: #1d1d1f; --leise: #6e6e73; --linie: #e3e3e8;
+    --kunde: #4f5bd5; --auftrag: #d97757; --treffer: #3a9a5b; --leer: #b0b0b8; --karte: #f6f6f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1e20; --text: #ececef; --leise: #98989f; --linie: #3a3a40;
+      --kunde: #8b94f0; --auftrag: #e08a6a; --treffer: #5cbf7e; --leer: #6a6a72; --karte: #26262a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 14px 16px; background: var(--bg); color: var(--text);
+         font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; }
+  .kopf { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .kopf h1 { font-size: 14px; margin: 0 auto 0 0; }
+  button { font: inherit; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--linie);
+           background: var(--karte); color: var(--text); cursor: pointer; }
+  button.an { background: var(--kunde); border-color: var(--kunde); color: #fff; }
+  .buehne { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 14px; align-items: start; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  caption { text-align: left; font-weight: 700; margin-bottom: 4px; }
+  th, td { border: 1px solid var(--linie); padding: 4px 6px; text-align: left; transition: background .3s, color .3s; }
+  th { background: var(--karte); }
+  .kunden caption { color: var(--kunde); }
+  .auftraege caption { color: var(--auftrag); }
+  tr.aktiv td { background: color-mix(in srgb, var(--kunde) 18%, transparent); }
+  tr.passt td { background: color-mix(in srgb, var(--treffer) 22%, transparent); }
+  tr.neu td { animation: rein .45s ease-out; }
+  td.null { color: var(--leer); font-style: italic; }
+  @keyframes rein { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  .erklaerung { margin-top: 12px; padding: 8px 10px; border-radius: 8px; background: var(--karte); min-height: 2.8em; }
+  code { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-size: 12px; }
+  @media (max-width: 560px) { .buehne { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { tr.neu td { animation: none; } }
+</style>
+</head>
+<body>
+<div class="kopf">
+  <h1>INNER JOIN vs. LEFT JOIN</h1>
+  <button id="inner" class="an">INNER JOIN</button>
+  <button id="left">LEFT JOIN</button>
+  <button id="start">▶ Abspielen</button>
+  <button id="schritt">Schritt →</button>
+</div>
+<div class="buehne">
+  <table class="kunden"><caption>kunde</caption>
+    <thead><tr><th>id</th><th>name</th></tr></thead><tbody id="kunden"></tbody></table>
+  <table class="auftraege"><caption>auftrag</caption>
+    <thead><tr><th>nr</th><th>kunde_id</th></tr></thead><tbody id="auftraege"></tbody></table>
+  <table><caption>Ergebnis</caption>
+    <thead><tr><th>name</th><th>nr</th></tr></thead><tbody id="ergebnis"></tbody></table>
+</div>
+<div class="erklaerung" id="text"></div>
+<script>
+  const kunden = [[1, "Meier"], [2, "Schulz"], [3, "Yilmaz"]];
+  const auftraege = [[101, 1], [102, 1], [103, 3]];
+  let art = "INNER", schritt = -1, timer = null;
+  const $ = (id) => document.getElementById(id);
+  const zeile = (zellen, klasse = "") =>
+    `<tr class="${klasse}">${zellen.map((z) => z === null ? '<td class="null">NULL</td>' : `<td>${z}</td>`).join("")}</tr>`;
+
+  function zeichneQuellen(aktiverKunde = null) {
+    $("kunden").innerHTML = kunden.map(([id, n]) => zeile([id, n], id === aktiverKunde ? "aktiv" : "")).join("");
+    $("auftraege").innerHTML = auftraege.map(([nr, k]) => zeile([nr, k], k === aktiverKunde ? "passt" : "")).join("");
+  }
+
+  function zuruecksetzen() {
+    clearInterval(timer); timer = null; $("start").textContent = "▶ Abspielen";
+    schritt = -1; $("ergebnis").innerHTML = ""; zeichneQuellen();
+    $("text").innerHTML = art === "INNER"
+      ? "<code>SELECT k.name, a.nr FROM kunde k INNER JOIN auftrag a ON k.id = a.kunde_id;</code><br>Nur Kunden <b>mit</b> passendem Auftrag."
+      : "<code>SELECT k.name, a.nr FROM kunde k LEFT JOIN auftrag a ON k.id = a.kunde_id;</code><br><b>Alle</b> Kunden – ohne Auftrag mit NULL.";
+  }
+
+  function weiter() {
+    schritt++;
+    if (schritt >= kunden.length) {
+      $("text").innerHTML += "<br>✔ Fertig. " + (art === "INNER" ? "Schulz fehlt – er hat keinen Auftrag." : "Schulz ist dabei, aber nr = NULL.");
+      clearInterval(timer); timer = null; $("start").textContent = "↺ Nochmal"; return;
+    }
+    const [id, name] = kunden[schritt];
+    zeichneQuellen(id);
+    const passend = auftraege.filter(([, k]) => k === id);
+    if (passend.length) {
+      passend.forEach(([nr]) => $("ergebnis").insertAdjacentHTML("beforeend", zeile([name, nr], "neu")));
+      $("text").innerHTML = `Kunde <b>${name}</b> (id ${id}): ${passend.length} passende(r) Auftrag/Aufträge → in das Ergebnis.`;
+    } else if (art === "LEFT") {
+      $("ergebnis").insertAdjacentHTML("beforeend", zeile([name, null], "neu"));
+      $("text").innerHTML = `Kunde <b>${name}</b> (id ${id}): kein Auftrag – LEFT JOIN behält ihn trotzdem, <code>nr</code> wird NULL.`;
+    } else {
+      $("text").innerHTML = `Kunde <b>${name}</b> (id ${id}): kein Auftrag – INNER JOIN lässt ihn weg.`;
+    }
+  }
+
+  $("inner").onclick = () => { art = "INNER"; $("inner").classList.add("an"); $("left").classList.remove("an"); zuruecksetzen(); };
+  $("left").onclick = () => { art = "LEFT"; $("left").classList.add("an"); $("inner").classList.remove("an"); zuruecksetzen(); };
+  $("schritt").onclick = () => { if (schritt >= kunden.length) zuruecksetzen(); weiter(); };
+  $("start").onclick = () => {
+    if (timer) { clearInterval(timer); timer = null; $("start").textContent = "▶ Weiter"; return; }
+    if (schritt >= kunden.length) zuruecksetzen();
+    $("start").textContent = "❚❚ Pause"; weiter(); timer = setInterval(weiter, 1800);
+  };
+  zuruecksetzen();
+</script>
+</body>
+</html>

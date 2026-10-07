@@ -2,6 +2,7 @@
 // Quelle der Wahrheit – Claude liest und schreibt dieselben Markdown-Dateien direkt.
 
 mod beobachter;
+mod grafik;
 mod notizen;
 
 use notizen::{Ergebnis, NotizInfo, NotizInhalt};
@@ -123,6 +124,11 @@ async fn notiz_loeschen(app: tauri::AppHandle, ordner: String, datei: String) ->
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        // Animierte Grafiken aus <Ordner>/assets/ – abgeschottet, siehe grafik.rs
+        .register_uri_scheme_protocol(grafik::SCHEMA, |ctx, request| match schule_pfad(ctx.app_handle()) {
+            Ok(root) => grafik::http_antwort(&root, &request),
+            Err(_) => tauri::http::Response::builder().status(500).body(Vec::new()).unwrap_or_default(),
+        })
         .invoke_handler(tauri::generate_handler![
             schule_oeffnen,
             ordner_erstellen,
