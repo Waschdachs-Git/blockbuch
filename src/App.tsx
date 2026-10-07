@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LERNFELDER, ordnerAusNamen } from "./lernfelder";
 import { Sidebar } from "./components/Sidebar";
 import { NoteList } from "./components/NoteList";
-import { EditorPane } from "./components/EditorPane";
+import { EditorPane, type EditorHandle } from "./components/EditorPane";
 import { useStoredState } from "./useStoredState";
 import { api, fehlerText, heute, type NotizInfo } from "./api";
 
@@ -19,6 +19,9 @@ function App() {
   const sidebarRef = useRef<HTMLElement>(null);
   const listeRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const editorRef = useRef<EditorHandle>(null);
+  // Gerade per ⌘N angelegte Notiz: nach dem Benennen direkt in den Text springen
+  const neueDatei = useRef<string | null>(null);
   const ersterRender = useRef(true);
   // Aktueller Ordner für asynchrone Antworten: alte Antworten nach Ordnerwechsel verwerfen
   const aktuellerOrdnerRef = useRef<string | null>(null);
@@ -80,7 +83,10 @@ function App() {
       // Inzwischen Ordner gewechselt? Dann dort nicht in den Umbenennen-Modus gehen
       if (aktuellerOrdnerRef.current !== ordner.name) return;
       await ladeNotizen(ordner.name, info.datei);
-      if (aktuellerOrdnerRef.current === ordner.name) setUmbenennenDatei(info.datei);
+      if (aktuellerOrdnerRef.current === ordner.name) {
+        neueDatei.current = info.datei;
+        setUmbenennenDatei(info.datei);
+      }
     } catch (e) {
       melde(e);
     } finally {
@@ -91,6 +97,8 @@ function App() {
   async function umbenennen(datei: string, titel: string) {
     if (!ordner) return;
     try {
+      // Erst ungespeicherte Änderungen sichern, sonst gehen sie beim Umbenennen verloren
+      await editorRef.current?.speichernJetzt();
       const info = await api.notizUmbenennen(ordner.name, datei, titel);
       await ladeNotizen(ordner.name, info.datei);
       setNotizVersion((v) => v + 1);
@@ -98,6 +106,13 @@ function App() {
       melde(e);
     }
     setUmbenennenDatei(null);
+    benennenFertig(datei);
+  }
+
+  function benennenFertig(datei: string) {
+    if (neueDatei.current !== datei) return;
+    neueDatei.current = null;
+    requestAnimationFrame(() => editorRef.current?.fokus());
   }
 
   async function loeschen(datei: string) {
@@ -105,6 +120,7 @@ function App() {
     const index = notizen.findIndex((n) => n.datei === datei);
     const nachbar = notizen[index + 1]?.datei ?? notizen[index - 1]?.datei ?? null;
     try {
+      await editorRef.current?.speichernJetzt();
       await api.notizLoeschen(ordner.name, datei);
       await ladeNotizen(ordner.name, nachbar);
       fokusListe();
@@ -211,11 +227,24 @@ function App() {
         onNeu={neueNotiz}
         onUmbenennenStart={setUmbenennenDatei}
         onUmbenennen={umbenennen}
-        onUmbenennenAbbrechen={() => setUmbenennenDatei(null)}
+        onUmbenennenAbbrechen={() => {
+          const d = umbenennenDatei;
+          setUmbenennenDatei(null);
+          if (d) benennenFertig(d);
+        }}
+        onWeiter={() => editorRef.current?.fokus()}
         onLoeschen={loeschen}
         onZurueck={fokusSidebar}
       />
-      <EditorPane ordner={ordner.name} datei={aktiveDatei} version={notizVersion} />
+      <EditorPane
+        ref={editorRef}
+        ordner={ordner.name}
+        datei={aktiveDatei}
+        version={notizVersion}
+        onGespeichert={() => ladeNotizen(ordner.name).catch(melde)}
+        onZurueck={fokusListe}
+        onFehler={melde}
+      />
       {meldung && (
         <div className="meldung" role="alert">
           <span>{meldung}</span>

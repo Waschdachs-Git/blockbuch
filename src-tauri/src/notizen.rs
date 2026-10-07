@@ -6,9 +6,19 @@ use serde::Serialize;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 
 pub type Ergebnis<T> = Result<T, String>;
+
+#[derive(Serialize, Debug)]
+pub struct NotizInhalt {
+    pub inhalt: String,
+    /// Änderungszeit beim Lesen (ms) – beim Speichern mitgeben, um fremde Änderungen zu erkennen
+    pub geaendert: u64,
+}
+
+/// Fehlertext-Präfix, an dem die Oberfläche einen Konflikt erkennt
+pub const KONFLIKT: &str = "KONFLIKT:";
 
 #[derive(Serialize, Debug)]
 pub struct NotizInfo {
@@ -184,8 +194,8 @@ pub fn lies_info(pfad: &Path) -> Ergebnis<NotizInfo> {
 
 /// Schreibt erst eine versteckte Temp-Datei und ersetzt dann in einem Schritt.
 /// Wer die Datei gleichzeitig liest (Claude), sieht nie einen halben Stand.
-/// `erwartet`: Änderungszeit beim Lesen – hat sich die Datei seitdem geändert, wird abgebrochen.
-pub fn schreibe_atomar(pfad: &Path, inhalt: &str, erwartet: Option<SystemTime>) -> Ergebnis<()> {
+/// `erwartet`: Änderungszeit (ms) beim Lesen – hat sich die Datei seitdem geändert, wird abgebrochen.
+pub fn schreibe_atomar(pfad: &Path, inhalt: &str, erwartet: Option<u64>) -> Ergebnis<()> {
     let ordner = pfad.parent().ok_or("Ungültiger Pfad")?;
     let name = pfad.file_name().and_then(|n| n.to_str()).ok_or("Ungültiger Pfad")?;
     let tmp = ordner.join(format!(".{name}.blockbuch-tmp"));
@@ -194,8 +204,11 @@ pub fn schreibe_atomar(pfad: &Path, inhalt: &str, erwartet: Option<SystemTime>) 
         f.write_all(inhalt.as_bytes()).map_err(fehler)?;
         f.sync_all().map_err(fehler)?;
         if let Some(t) = erwartet {
-            if fs::metadata(pfad).and_then(|m| m.modified()).ok() != Some(t) {
-                return Err("Die Notiz wurde gerade von außen geändert (z. B. von Claude). Bitte nochmal versuchen.".to_string());
+            if !pfad.exists() {
+                return Err(format!("{KONFLIKT} Die Notiz gibt es nicht mehr (gelöscht oder umbenannt)."));
+            }
+            if geaendert_ms(pfad) != t {
+                return Err(format!("{KONFLIKT} Die Notiz wurde gerade von außen geändert (z. B. von Claude)."));
             }
         }
         fs::rename(&tmp, pfad).map_err(fehler)
@@ -272,8 +285,19 @@ pub fn notizen_auflisten(root: &Path, ordner: &str) -> Ergebnis<Vec<NotizInfo>> 
     Ok(notizen)
 }
 
-pub fn notiz_lesen(root: &Path, ordner: &str, datei: &str) -> Ergebnis<String> {
-    fs::read_to_string(notiz_pfad(root, ordner, datei)?).map_err(fehler)
+pub fn notiz_lesen(root: &Path, ordner: &str, datei: &str) -> Ergebnis<NotizInhalt> {
+    let pfad = notiz_pfad(root, ordner, datei)?;
+    let geaendert = geaendert_ms(&pfad);
+    let inhalt = fs::read_to_string(&pfad).map_err(fehler)?;
+    Ok(NotizInhalt { inhalt, geaendert })
+}
+
+/// Speichert den ganzen Inhalt. `erwartet` = Änderungszeit vom letzten Lesen/Speichern;
+/// `None` überschreibt bewusst (nur nach Rückfrage beim Konflikt).
+pub fn notiz_speichern(root: &Path, ordner: &str, datei: &str, inhalt: &str, erwartet: Option<u64>) -> Ergebnis<u64> {
+    let pfad = notiz_pfad(root, ordner, datei)?;
+    schreibe_atomar(&pfad, inhalt, erwartet)?;
+    Ok(geaendert_ms(&pfad))
 }
 
 pub fn notiz_erstellen(root: &Path, ordner: &str, lernfeld: Option<&str>, titel: &str, datum: &str) -> Ergebnis<NotizInfo> {
@@ -319,7 +343,7 @@ pub fn notiz_umbenennen(root: &Path, ordner: &str, datei: &str, titel: &str) -> 
     }
     let ordner_p = ordner_pfad(root, ordner)?;
     let alt = notiz_pfad(root, ordner, datei)?;
-    let gelesen_um = fs::metadata(&alt).and_then(|m| m.modified()).map_err(fehler)?;
+    let gelesen_um = geaendert_ms(&alt);
     let roh = fs::read_to_string(&alt).map_err(fehler)?;
 
     // Zeilenenden und BOM der Datei beibehalten
@@ -424,7 +448,7 @@ mod tests {
         let r = notiz_umbenennen(&root, "LF05-Daten", &r.datei, "Normalformen").unwrap();
         assert_eq!(r.datei, "2026-10-07-Normalformen.md");
         assert_eq!(notizen_auflisten(&root, "LF05-Daten").unwrap().len(), 2);
-        let inhalt = notiz_lesen(&root, "LF05-Daten", &r.datei).unwrap();
+        let inhalt = notiz_lesen(&root, "LF05-Daten", &r.datei).unwrap().inhalt;
         assert!(inhalt.contains("# Normalformen\n") && inhalt.contains("lernfeld: LF05"));
     }
 
@@ -438,7 +462,7 @@ mod tests {
         assert_eq!(info.datum, "2026-10-07");
 
         let r = notiz_umbenennen(&root, "LF05-Daten", "2026-10-07-Skript.md", "Setup").unwrap();
-        let inhalt = notiz_lesen(&root, "LF05-Daten", &r.datei).unwrap();
+        let inhalt = notiz_lesen(&root, "LF05-Daten", &r.datei).unwrap().inhalt;
         assert!(inhalt.contains("# pakete installieren"), "Code-Kommentar muss bleiben");
         assert!(inhalt.contains("# Setup\r\n"), "Titel eingefügt, CRLF erhalten: {inhalt:?}");
         assert!(!inhalt.replace("\r\n", "").contains('\n'), "keine gemischten Zeilenenden");
@@ -458,12 +482,31 @@ mod tests {
         let (_tmp, root) = testordner();
         let pfad = root.join("LF05-Daten/a.md");
         fs::write(&pfad, "alt").unwrap();
-        let alt = SystemTime::UNIX_EPOCH;
-        assert!(schreibe_atomar(&pfad, "neu", Some(alt)).is_err());
+        assert!(schreibe_atomar(&pfad, "neu", Some(1)).unwrap_err().starts_with(KONFLIKT));
         assert_eq!(fs::read_to_string(&pfad).unwrap(), "alt");
         assert!(!root.join("LF05-Daten/.a.md.blockbuch-tmp").exists());
         schreibe_atomar(&pfad, "neu", None).unwrap();
         assert_eq!(fs::read_to_string(&pfad).unwrap(), "neu");
+    }
+
+    #[test]
+    fn speichern_mit_konflikterkennung() {
+        let (_tmp, root) = testordner();
+        let n = notiz_erstellen(&root, "LF05-Daten", None, "Joins", "2026-10-07").unwrap();
+        let gelesen = notiz_lesen(&root, "LF05-Daten", &n.datei).unwrap();
+        let neu = notiz_speichern(&root, "LF05-Daten", &n.datei, "# Joins\n\nText\n", Some(gelesen.geaendert)).unwrap();
+
+        // Claude ändert die Datei von außen
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        fs::write(root.join("LF05-Daten").join(&n.datei), "# Joins\n\nVon Claude\n").unwrap();
+        let err = notiz_speichern(&root, "LF05-Daten", &n.datei, "# Joins\n\nMein Text\n", Some(neu)).unwrap_err();
+        assert!(err.starts_with(KONFLIKT));
+        assert!(notiz_lesen(&root, "LF05-Daten", &n.datei).unwrap().inhalt.contains("Von Claude"));
+
+        // Gelöschte Datei wird beim Speichern nicht wieder angelegt
+        fs::remove_file(root.join("LF05-Daten").join(&n.datei)).unwrap();
+        assert!(notiz_speichern(&root, "LF05-Daten", &n.datei, "x", Some(neu)).is_err());
+        assert!(!root.join("LF05-Daten").join(&n.datei).exists());
     }
 
     #[test]

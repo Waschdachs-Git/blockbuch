@@ -3,7 +3,7 @@
 
 mod notizen;
 
-use notizen::{Ergebnis, NotizInfo};
+use notizen::{Ergebnis, NotizInfo, NotizInhalt};
 use serde::Serialize;
 use std::path::PathBuf;
 use tauri::Manager;
@@ -37,8 +37,19 @@ async fn notizen_auflisten(app: tauri::AppHandle, ordner: String) -> Ergebnis<Ve
 }
 
 #[tauri::command]
-async fn notiz_lesen(app: tauri::AppHandle, ordner: String, datei: String) -> Ergebnis<String> {
+async fn notiz_lesen(app: tauri::AppHandle, ordner: String, datei: String) -> Ergebnis<NotizInhalt> {
     notizen::notiz_lesen(&schule_pfad(&app)?, &ordner, &datei)
+}
+
+#[tauri::command]
+async fn notiz_speichern(
+    app: tauri::AppHandle,
+    ordner: String,
+    datei: String,
+    inhalt: String,
+    erwartet: Option<u64>,
+) -> Ergebnis<u64> {
+    notizen::notiz_speichern(&schule_pfad(&app)?, &ordner, &datei, &inhalt, erwartet)
 }
 
 #[tauri::command]
@@ -71,6 +82,7 @@ pub fn run() {
             ordner_erstellen,
             notizen_auflisten,
             notiz_lesen,
+            notiz_speichern,
             notiz_erstellen,
             notiz_umbenennen,
             notiz_loeschen

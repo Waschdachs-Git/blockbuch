@@ -18,6 +18,7 @@ type Props = {
   onUmbenennenAbbrechen: () => void;
   onLoeschen: (datei: string) => void;
   onZurueck: () => void;
+  onWeiter: () => void;
 };
 
 export function NoteList(props: Props) {
@@ -42,6 +43,11 @@ export function NoteList(props: Props) {
       return;
     }
     if (!zielEl.classList.contains("notiz")) return;
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      props.onWeiter();
+      return;
+    }
     const index = notizen.findIndex((n) => n.datei === aktiveDatei);
     if (index < 0) return;
     if (e.key === "Enter") {
@@ -119,7 +125,7 @@ export function NoteList(props: Props) {
                     tabIndex={istAktiv || (!aktiveDatei && n === notizen[0]) ? 0 : -1}
                     onClick={() => props.onAuswahl(n.datei)}
                     onDoubleClick={() => props.onUmbenennenStart(n.datei)}
-                    title="Enter: umbenennen · ⌘⌫: in den Papierkorb"
+                    title="→ schreiben · Enter: umbenennen · ⌘⌫: in den Papierkorb"
                   >
                     <span className="notiz__titel">{n.titel}</span>
                     <span className="notiz__datum">{datumAnzeigen(n.datum)}</span>

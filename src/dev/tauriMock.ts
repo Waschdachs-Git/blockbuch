@@ -30,6 +30,7 @@ const frei = (o: string, basis: string) => {
 };
 
 const ordner = () => Object.keys(fs).sort();
+const zeiten: Record<string, number> = {};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function invoke(cmd: string, a: any): Promise<unknown> {
@@ -47,7 +48,15 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
         .map(([d, c]) => info(d, c))
         .sort((x, y) => y.datum.localeCompare(x.datum));
     case "notiz_lesen":
-      return fs[a.ordner][a.datei];
+      return { inhalt: fs[a.ordner][a.datei], geaendert: zeiten[`${a.ordner}/${a.datei}`] ?? 1 };
+    case "notiz_speichern": {
+      const k = `${a.ordner}/${a.datei}`;
+      if (a.erwartet !== null && (fs[a.ordner][a.datei] === undefined || (zeiten[k] ?? 1) !== a.erwartet))
+        throw "KONFLIKT: Die Notiz wurde gerade von außen geändert (z. B. von Claude).";
+      fs[a.ordner][a.datei] = a.inhalt;
+      zeiten[k] = Date.now();
+      return zeiten[k];
+    }
     case "notiz_erstellen": {
       const d = frei(a.ordner, `${a.datum}-${slug(a.titel)}`);
       fs[a.ordner][d] = `---\n${a.lernfeld ? `lernfeld: ${a.lernfeld}\n` : ""}datum: ${a.datum}\ntags: []\n---\n\n# ${a.titel}\n\n`;
@@ -72,4 +81,10 @@ window.__TAURI_INTERNALS__ = { invoke, transformCallback: () => 0 };
 // Für Tests im Browser einsehbar
 // @ts-expect-error – Debug-Zugriff
 window.__blockbuchFs = fs;
+// Simuliert eine Änderung von außen (wie durch Claude)
+// @ts-expect-error – Debug-Zugriff
+window.__aendereVonAussen = (o: string, d: string, inhalt: string) => {
+  fs[o][d] = inhalt;
+  zeiten[`${o}/${d}`] = Date.now() + 1;
+};
 export {};
