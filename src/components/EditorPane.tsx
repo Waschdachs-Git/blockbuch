@@ -12,6 +12,8 @@ export type EditorHandle = {
   fokus: () => void;
   /** Ungespeicherte Änderungen sofort sichern – vor Umbenennen, Löschen und Beenden aufrufen */
   speichernJetzt: () => Promise<void>;
+  /** Die offene Notiz wurde auf der Platte geändert (z. B. von Claude) */
+  externGeaendert: () => Promise<void>;
 };
 
 type Props = {
@@ -35,6 +37,9 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   const [geladen, setGeladen] = useState(false);
   // Notiz enthält etwas, das der Editor nicht darstellen kann → erst nach Bestätigung bearbeitbar
   const [schreibschutz, setSchreibschutz] = useState(false);
+  // kurzer Hinweis oben rechts, wenn eine Änderung von außen übernommen wurde
+  const [vonAussen, setVonAussen] = useState(false);
+  const flaecheRef = useRef<HTMLDivElement>(null);
 
   const geoeffnet = useRef<Geoeffnet | null>(null);
   const geaendert = useRef(false); // ungespeicherte Änderungen im Editor
@@ -171,6 +176,53 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     }
   }
 
+  /** Änderung auf der Platte übernehmen. Ohne ungespeicherte Eingaben: neu laden und Cursor/Scroll
+   *  behalten. Mit ungespeicherten Eingaben: sofort Konflikt anzeigen (nichts wird überschrieben). */
+  function externGeaendert(): Promise<void> {
+    // Hinter laufende Speichervorgänge einreihen – so kennen wir die Änderungszeit des eigenen Schreibens
+    laufend.current = laufend.current.then(async () => {
+      const ziel = geoeffnet.current;
+      if (!editor || !ziel) return;
+      let gelesen;
+      try {
+        gelesen = await api.notizLesen(ziel.ordner, ziel.datei);
+      } catch {
+        return; // gelöscht/umbenannt: darum kümmert sich die Notizliste (und sichert ggf. als Kopie)
+      }
+      if (geoeffnet.current !== ziel) return;
+      if (gelesen.geaendert === ziel.geaendert) return; // unser eigenes Speichern
+
+      if (geaendert.current) {
+        window.clearTimeout(timer.current);
+        setStatus("fehler");
+        setKonflikt("Die Notiz wurde gerade von außen geändert (z. B. von Claude).");
+        return;
+      }
+
+      // Übernehmen – Cursor und Scrollposition merken
+      const { from, to } = editor.state.selection;
+      const scroll = flaecheRef.current?.scrollTop ?? 0;
+      const fokus = editor.isFocused;
+      const teile = zerlege(gelesen.inhalt);
+      ziel.teile = teile;
+      ziel.geaendert = gelesen.geaendert;
+      editor.commands.setContent(teile.text, { contentType: "markdown", emitUpdate: false });
+      const ende = editor.state.doc.content.size;
+      editor.commands.setTextSelection({ from: Math.min(from, ende), to: Math.min(to, ende) });
+      if (fokus) editor.commands.focus(undefined, { scrollIntoView: false });
+      if (flaecheRef.current) flaecheRef.current.scrollTop = scroll;
+
+      const riskant = wuerdeInhaltVerlieren(teile.text, aufraeumen(editor.getMarkdown()));
+      setSchreibschutz(riskant);
+      editor.setEditable(!riskant, false);
+      setKonflikt(null);
+      setStatus("gespeichert");
+      setVonAussen(true);
+      window.setTimeout(() => setVonAussen(false), 2500);
+    });
+    return laufend.current;
+  }
+
   // Notiz wechseln: alte sichern, neue laden
   useEffect(() => {
     if (!editor) return;
@@ -204,6 +256,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
       else fokusNachLaden.current = true;
     },
     speichernJetzt: () => sichernVorWeggang(),
+    externGeaendert,
   }));
 
   const statusText: Record<Status, string> = {
@@ -217,8 +270,8 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     <main className="editor">
       <div className="titelleiste" data-tauri-drag-region>
         {datei && geladen && (
-          <span className={`speicherstatus speicherstatus--${status}`} role="status">
-            {statusText[status]}
+          <span className={`speicherstatus speicherstatus--${vonAussen ? "aussen" : status}`} role="status">
+            {vonAussen ? "Von außen aktualisiert" : statusText[status]}
           </span>
         )}
       </div>
@@ -269,7 +322,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
         </div>
       ) : null}
 
-      <div className="editor__flaeche" hidden={!datei || !!ladeFehler || !geladen}>
+      <div className="editor__flaeche" ref={flaecheRef} hidden={!datei || !!ladeFehler || !geladen}>
         <EditorContent editor={editor} />
       </div>
       <SlashMenu zustand={slash} />

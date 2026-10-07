@@ -717,3 +717,22 @@ button {
   font-size: 11px;
   color: var(--text-leise);
 }
+
+/* ---------- Schritt 4: Live-Sync ---------- */
+
+.speicherstatus--aussen {
+  color: var(--akzent);
+  font-weight: 600;
+  animation: aufleuchten 2.5s ease-out;
+}
+
+@keyframes aufleuchten {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speicherstatus--aussen { animation: none; }
+}

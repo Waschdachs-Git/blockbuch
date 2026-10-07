@@ -5,7 +5,7 @@ import { Sidebar } from "./components/Sidebar";
 import { NoteList } from "./components/NoteList";
 import { EditorPane, type EditorHandle } from "./components/EditorPane";
 import { useStoredState } from "./useStoredState";
-import { api, fehlerText, heute, type NotizInfo } from "./api";
+import { api, fehlerText, heute, type Aenderung, type NotizInfo } from "./api";
 
 function App() {
   const [ordnerNamen, setOrdnerNamen] = useState<string[] | null>(null);
@@ -44,6 +44,53 @@ function App() {
         await api.beenden();
       }
     }).then((f) => (aktiv ? (abmelden = f) : f()));
+    return () => {
+      aktiv = false;
+      abmelden?.();
+    };
+  }, []);
+
+  // Änderungen auf der Platte (z. B. durch Claude) live übernehmen.
+  // Der Handler steht in einem Ref, damit er immer den aktuellen Zustand sieht.
+  const notizenRef = useRef(notizen);
+  notizenRef.current = notizen;
+  const aktiveDateiRef = useRef(aktiveDatei);
+  aktiveDateiRef.current = aktiveDatei;
+
+  async function ladeNachExtern(name: string) {
+    const vorher = new Set(notizenRef.current.map((n) => n.datei));
+    const liste = await api.notizenAuflisten(name);
+    if (name !== aktuellerOrdnerRef.current) return;
+    setNotizen(liste);
+    setUmbenennenDatei((d) => (d && liste.some((n) => n.datei === d) ? d : null));
+    setAktiveDatei((bisher) => {
+      if (bisher && liste.some((n) => n.datei === bisher)) return bisher;
+      // Offene Notiz ist verschwunden: genau eine neue Datei → wurde wohl umbenannt (z. B. von Claude)
+      const neu = liste.filter((n) => !vorher.has(n.datei));
+      return neu.length === 1 ? neu[0].datei : (liste[0]?.datei ?? null);
+    });
+  }
+
+  const externRef = useRef<(a: Aenderung[]) => void>(() => {});
+  externRef.current = (aenderungen) => {
+    const ordnerName = aktuellerOrdnerRef.current;
+    if (aenderungen.some((a) => a.datei === null)) {
+      api.ordnerAuflisten().then(setOrdnerNamen).catch(melde);
+    }
+    if (ordnerName && aenderungen.some((a) => a.ordner === ordnerName)) {
+      ladeNachExtern(ordnerName).catch(melde);
+      if (aenderungen.some((a) => a.ordner === ordnerName && a.datei === aktiveDateiRef.current)) {
+        editorRef.current?.externGeaendert();
+      }
+    }
+  };
+
+  useEffect(() => {
+    let aktiv = true;
+    let abmelden: (() => void) | undefined;
+    listen<Aenderung[]>("schule-geaendert", (e) => externRef.current(e.payload)).then((f) =>
+      aktiv ? (abmelden = f) : f(),
+    );
     return () => {
       aktiv = false;
       abmelden?.();

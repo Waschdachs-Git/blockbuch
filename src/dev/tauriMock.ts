@@ -32,6 +32,19 @@ const frei = (o: string, basis: string) => {
 const ordner = () => Object.keys(fs).sort();
 const zeiten: Record<string, number> = {};
 
+// Ereignisse (listen/emit) nachbilden
+const rueckrufe = new Map<number, (x: unknown) => void>();
+const zuhoerer: { event: string; handler: number }[] = [];
+let naechsteId = 1;
+function transformCallback(cb: (x: unknown) => void) {
+  const id = naechsteId++;
+  rueckrufe.set(id, cb);
+  return id;
+}
+function emit(event: string, payload: unknown) {
+  for (const z of zuhoerer.filter((z) => z.event === event)) rueckrufe.get(z.handler)?.({ event, payload, id: z.handler });
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function invoke(cmd: string, a: any): Promise<unknown> {
   await new Promise((r) => setTimeout(r, 20)); // etwas Verzögerung wie bei echter IPC
@@ -55,6 +68,8 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
         throw "KONFLIKT: Die Notiz wurde gerade von außen geändert (z. B. von Claude).";
       fs[a.ordner][a.datei] = a.inhalt;
       zeiten[k] = Date.now();
+      // wie der echte Beobachter: auch eigene Schreibvorgänge werden gemeldet
+      setTimeout(() => emit("schule-geaendert", [{ ordner: a.ordner, datei: a.datei }]), 200);
       return zeiten[k];
     }
     case "notiz_erstellen": {
@@ -78,7 +93,12 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
       console.info("[Simulation] App würde jetzt beenden");
       return null;
     case "plugin:event|listen":
-      return 0;
+      zuhoerer.push({ event: a.event, handler: a.handler });
+      return a.handler;
+    case "plugin:event|unlisten":
+      return null;
+    case "ordner_auflisten":
+      return ordner();
     case "notiz_loeschen":
       delete fs[a.ordner][a.datei];
       return null;
@@ -87,7 +107,7 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
 }
 
 // @ts-expect-error – interne Tauri-Schnittstelle, die @tauri-apps/api aufruft
-window.__TAURI_INTERNALS__ = { invoke, transformCallback: () => 0 };
+window.__TAURI_INTERNALS__ = { invoke, transformCallback };
 // für listen()/unlisten() aus @tauri-apps/api/event
 (window as unknown as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
 // Für Tests im Browser einsehbar
@@ -95,8 +115,21 @@ window.__TAURI_INTERNALS__ = { invoke, transformCallback: () => 0 };
 window.__blockbuchFs = fs;
 // Simuliert eine Änderung von außen (wie durch Claude)
 // @ts-expect-error – Debug-Zugriff
-window.__aendereVonAussen = (o: string, d: string, inhalt: string) => {
+window.__aendereVonAussen = (o: string, d: string, inhalt: string, melden = true) => {
   fs[o][d] = inhalt;
   zeiten[`${o}/${d}`] = Date.now() + 1;
+  if (melden) setTimeout(() => emit("schule-geaendert", [{ ordner: o, datei: d }]), 200);
+};
+// Simuliert Umbenennen/Löschen von außen
+// @ts-expect-error – Debug-Zugriff
+window.__benenneUmVonAussen = (o: string, alt: string, neu: string) => {
+  fs[o][neu] = fs[o][alt];
+  delete fs[o][alt];
+  setTimeout(() => emit("schule-geaendert", [{ ordner: o, datei: alt }, { ordner: o, datei: neu }]), 200);
+};
+// @ts-expect-error – Debug-Zugriff
+window.__loescheVonAussen = (o: string, d: string) => {
+  delete fs[o][d];
+  setTimeout(() => emit("schule-geaendert", [{ ordner: o, datei: d }]), 200);
 };
 export {};

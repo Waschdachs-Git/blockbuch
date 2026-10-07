@@ -1,6 +1,7 @@
 // Tauri-Befehle: dünne Hüllen um notizen.rs. Die Dateien in ~/Schule sind die einzige
 // Quelle der Wahrheit – Claude liest und schreibt dieselben Markdown-Dateien direkt.
 
+mod beobachter;
 mod notizen;
 
 use notizen::{Ergebnis, NotizInfo, NotizInhalt};
@@ -50,6 +51,11 @@ async fn schule_oeffnen(app: tauri::AppHandle, standard_ordner: Vec<String>) -> 
 #[tauri::command]
 async fn ordner_erstellen(app: tauri::AppHandle, name: String) -> Ergebnis<Vec<String>> {
     notizen::ordner_erstellen(&schule_pfad(&app)?, &name)
+}
+
+#[tauri::command]
+async fn ordner_auflisten(app: tauri::AppHandle) -> Ergebnis<Vec<String>> {
+    notizen::ordner_liste(&schule_pfad(&app)?)
 }
 
 #[tauri::command]
@@ -120,6 +126,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             schule_oeffnen,
             ordner_erstellen,
+            ordner_auflisten,
             notizen_auflisten,
             notiz_lesen,
             notiz_speichern,
@@ -133,6 +140,17 @@ pub fn run() {
         // (das Standard-"Beenden" schließt die App sofort, ohne dass die Oberfläche speichern kann)
         .setup(|app| {
             let h = app.handle();
+
+            // ~/Schule beobachten, damit Änderungen von Claude sofort sichtbar werden
+            let root = schule_pfad(h)?;
+            std::fs::create_dir_all(&root)?;
+            match beobachter::starten(h.clone(), root) {
+                Ok(b) => {
+                    app.manage(b);
+                }
+                Err(e) => eprintln!("[blockbuch] Dateiüberwachung konnte nicht starten: {e}"),
+            }
+
             let beenden = MenuItemBuilder::with_id("beenden", "Blockbuch beenden")
                 .accelerator("CmdOrCtrl+Q")
                 .build(h)?;
