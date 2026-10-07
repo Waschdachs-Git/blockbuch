@@ -4,6 +4,9 @@ Diese Datei liest Claude bei jeder Sitzung in `~/Schule` automatisch mit (über 
 Je mehr hier steht, desto passender helfen die Erklärungen. Fülle aus, was du magst – alles ist optional.
 Die App überschreibt diese Datei nie.
 
+Am einfachsten: Sag Claude (in `~/Schule`) „Lass uns ueber-mich.md zusammen ausfüllen“ – Claude stellt
+dir dann ein paar Fragen und trägt die Antworten hier ein.
+
 ## Ausbildung
 
 - Ausbildungsberuf: Fachinformatiker/in für Anwendungsentwicklung

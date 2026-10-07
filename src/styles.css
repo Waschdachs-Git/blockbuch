@@ -824,7 +824,7 @@ button {
   --code-schluesselwort: #a626a4;
   --code-text: #50a14f;
   --code-zahl: #986801;
-  --code-kommentar: #8a8f98;
+  --code-kommentar: #6a6f78;
   --code-name: #4078f2;
   --code-typ: #c18401;
   --code-attribut: #e45649;
@@ -849,7 +849,7 @@ button {
 
 .inhalt .codeblock pre {
   margin: 0;
-  padding-top: 14px;
+  padding-top: 28px; /* Platz für die Sprachauswahl, damit sie keinen Code verdeckt */
 }
 
 .codeblock__kopf {

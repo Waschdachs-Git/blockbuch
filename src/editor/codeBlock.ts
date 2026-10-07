@@ -1,11 +1,14 @@
-// Codeblock mit Syntax-Farben (lowlight/highlight.js), Sprachauswahl und Tab-Einrückung.
+// Codeblock mit Syntax-Farben (lowlight/highlight.js), Sprachauswahl und Tab-Einrückung
+// (Tab/⇧Tab rücken ein/aus – auch mehrere markierte Zeilen; eingebaut in TipTap).
 // Beim Speichern wird ein ausreichend langer Zaun gewählt: Enthält der Code selbst ```
 // (z. B. eine Notiz über Markdown), wird mit ```` umschlossen – sonst wäre der Block kaputt.
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import type { Node as PMNode } from "@tiptap/pm/model";
 
-export const lowlight = createLowlight(common);
+const basis = createLowlight(common);
+/** Ohne bzw. mit unbekannter Sprache nicht raten (falsche Farben, langsam) – einfach als Text */
+export const lowlight: typeof basis = { ...basis, highlightAuto: (wert: string) => basis.highlight("plaintext", wert) };
 
 /** Sprachen für die Auswahl – die wichtigsten für Fachinformatiker AE zuerst */
 export const SPRACHEN: [wert: string, name: string][] = [
@@ -34,8 +37,6 @@ const KURZFORMEN: Record<string, string> = {
   shell: "Bash / Shell", kt: "Kotlin", yml: "YAML", "c++": "C++", htm: "HTML", mysql: "SQL", plaintext: "Text",
 };
 
-const EINRUECKUNG = "    ";
-
 export function zaunFuer(code: string): string {
   const laengste = Math.max(0, ...(code.match(/`+/g) ?? []).map((r) => r.length));
   return "`".repeat(Math.max(3, laengste + 1));
@@ -53,26 +54,19 @@ export const SichererCodeBlock = CodeBlockLowlight.extend({
   addKeyboardShortcuts() {
     return {
       ...this.parent?.(),
-      // Tab rückt im Code ein, statt den Editor zu verlassen
-      Tab: () => {
-        if (!this.editor.isActive(this.name)) return false;
-        return this.editor.commands.insertContent(EINRUECKUNG);
-      },
-      // ⇧Tab entfernt bis zu 4 Leerzeichen am Anfang der aktuellen Zeile
-      "Shift-Tab": () => {
+      // ⌥⌘L: Sprachauswahl des aktuellen Codeblocks per Tastatur öffnen (Esc führt zurück)
+      "Mod-Alt-l": () => {
         if (!this.editor.isActive(this.name)) return false;
         const { $from } = this.editor.state.selection;
-        const text = $from.parent.textContent;
-        const zeilenStart = text.lastIndexOf("\n", $from.parentOffset - 1) + 1;
-        const leer = /^ {1,4}/.exec(text.slice(zeilenStart))?.[0].length ?? 0;
-        if (leer === 0) return true;
-        const start = $from.start() + zeilenStart;
-        return this.editor.commands.deleteRange({ from: start, to: start + leer });
+        const dom = this.editor.view.nodeDOM($from.before($from.depth));
+        const auswahl = dom instanceof HTMLElement ? dom.querySelector("select") : null;
+        auswahl?.focus();
+        return !!auswahl;
       },
     };
   },
 
-  // Sprachauswahl oben rechts im Block (Tastatur: Tab-Taste erreicht sie nicht – Sprache per ```java)
+  // Sprachauswahl oben rechts im Block (Tastatur: ⌥⌘L im Codeblock, oder Sprache direkt per ```java)
   addNodeView() {
     return ({ node, editor, getPos }) => {
       let aktuell: PMNode = node;
@@ -96,7 +90,7 @@ export const SichererCodeBlock = CodeBlockLowlight.extend({
       const fuelleAuswahl = (sprache: string) => {
         const liste = [...SPRACHEN];
         // unbekannte Sprache (z. B. "grafik" oder eine Kurzform) als eigene Option behalten
-        if (sprache && !liste.some(([w]) => w === sprache)) liste.push([sprache, KURZFORMEN[sprache.toLowerCase()] ?? sprache]);
+        if (sprache && !liste.some(([w]) => w === sprache)) liste.push([sprache, KURZFORMEN[sprache.toLowerCase()] ? `${KURZFORMEN[sprache.toLowerCase()]} (${sprache})` : sprache]);
         auswahl.replaceChildren(
           ...liste.map(([wert, name]) => {
             const o = document.createElement("option");
@@ -121,7 +115,18 @@ export const SichererCodeBlock = CodeBlockLowlight.extend({
           })
           .run();
         // danach direkt weiterschreiben können (Cursor ans Ende des Codeblocks)
-        requestAnimationFrame(() => editor.commands.focus(pos + aktuell.nodeSize - 1));
+        requestAnimationFrame(() => {
+          const p = getPos();
+          if (editor.isDestroyed || typeof p !== "number") return;
+          editor.commands.focus(p + aktuell.nodeSize - 1);
+        });
+      });
+
+      auswahl.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        e.preventDefault();
+        e.stopPropagation();
+        editor.commands.focus();
       });
 
       return {
@@ -138,4 +143,6 @@ export const SichererCodeBlock = CodeBlockLowlight.extend({
       };
     };
   },
-}).configure({ lowlight, defaultLanguage: null });
+  // defaultLanguage bleibt null – sonst bekäme jeder neue Block "```plaintext" in die Datei.
+  // Ohne Sprache greift highlightAuto, und das färbt dank `lowlight` oben einfach als Text.
+}).configure({ lowlight, defaultLanguage: null, enableTabIndentation: true, tabSize: 4 });
