@@ -255,3 +255,167 @@ button {
   outline: 2px solid var(--akzent);
   outline-offset: 1px;
 }
+
+/* ---------- Schritt 2: Ordner, Notizen, Eingaben ---------- */
+
+.sidebar__scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+
+.sidebar__scroll .sidebar__liste {
+  overflow: visible;
+  padding-bottom: 6px;
+}
+
+.sidebar__abschnitt-zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 12px;
+  margin-top: 8px;
+}
+
+.sidebar__nummer--ordner {
+  display: grid;
+  place-items: center start;
+}
+
+.sidebar__hinweis {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--text-leise);
+}
+
+.icon-knopf--klein {
+  width: 20px;
+  height: 20px;
+}
+
+.titelleiste__platz {
+  flex: 1;
+  align-self: stretch;
+}
+
+.inline-eingabe {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--akzent);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.inline-eingabe--notiz {
+  padding: 9px 10px;
+  font-weight: 600;
+}
+
+.notizliste__liste {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.notiz {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+.notiz:hover {
+  background: var(--bg-hover);
+}
+
+.notiz.ist-aktiv {
+  background: var(--bg-aktiv);
+}
+
+.notiz.ist-aktiv:focus-visible,
+.notizliste__liste:focus-within .notiz.ist-aktiv {
+  background: var(--bg-aktiv-fokus);
+  color: var(--text-aktiv-fokus);
+  outline: none;
+}
+
+.notiz__titel {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notiz__datum {
+  font-size: 11px;
+  color: var(--text-leise);
+  font-variant-numeric: tabular-nums;
+}
+
+.notizliste__liste:focus-within .ist-aktiv .notiz__datum {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.vorschau {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 40px 40px;
+}
+
+.vorschau__datei {
+  font-size: 11px;
+  color: var(--text-leise);
+  margin-bottom: 12px;
+}
+
+.vorschau__text {
+  margin: 0;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.meldung {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, calc(100% - 32px));
+  padding: 8px 8px 8px 14px;
+  border-radius: 10px;
+  background: #c4314b;
+  color: #fff;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
+}
+
+.meldung .icon-knopf {
+  color: inherit;
+}
+
+.laden {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-leise);
+  text-align: center;
+}

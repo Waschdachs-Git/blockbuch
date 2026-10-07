@@ -1,0 +1,475 @@
+// Kernlogik für Ordner und Notizen in ~/Schule – unabhängig von Tauri, damit sie testbar ist.
+// Grundregeln: nie eine fremde Datei überschreiben, nie halbe Dateien hinterlassen,
+// Änderungen von außen (Claude) nicht stillschweigend verwerfen.
+
+use serde::Serialize;
+use std::fs;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub type Ergebnis<T> = Result<T, String>;
+
+#[derive(Serialize, Debug)]
+pub struct NotizInfo {
+    pub datei: String,
+    pub titel: String,
+    pub datum: String,
+    pub geaendert: u64,
+}
+
+fn fehler(e: impl std::fmt::Display) -> String {
+    e.to_string()
+}
+
+/// Nur einfache Namen direkt im Ordner – keine Pfade, nichts Verstecktes, keine Zeilenumbrüche.
+pub fn pruefe_name(name: &str) -> Ergebnis<()> {
+    if name.trim().is_empty() || name.starts_with('.') || name.contains(['/', '\\', '\0', ':', '\n', '\r']) {
+        return Err(format!("Ungültiger Name: „{name}“"));
+    }
+    Ok(())
+}
+
+pub fn ordner_pfad(root: &Path, ordner: &str) -> Ergebnis<PathBuf> {
+    pruefe_name(ordner)?;
+    let pfad = root.join(ordner);
+    if !pfad.is_dir() {
+        return Err(format!("Ordner „{ordner}“ gibt es nicht mehr."));
+    }
+    Ok(pfad)
+}
+
+pub fn notiz_pfad(root: &Path, ordner: &str, datei: &str) -> Ergebnis<PathBuf> {
+    pruefe_name(datei)?;
+    if !datei.ends_with(".md") {
+        return Err(format!("„{datei}“ ist keine Notiz."));
+    }
+    Ok(ordner_pfad(root, ordner)?.join(datei))
+}
+
+pub fn ordner_liste(root: &Path) -> Ergebnis<Vec<String>> {
+    let mut namen: Vec<String> = fs::read_dir(root)
+        .map_err(fehler)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|n| !n.starts_with('.'))
+        .collect();
+    namen.sort();
+    Ok(namen)
+}
+
+/// "Subnetting & VLSM" -> "Subnetting-VLSM", Umlaute werden ausgeschrieben.
+pub fn slug(titel: &str) -> String {
+    let mut s = String::new();
+    for c in titel.trim().chars() {
+        match c {
+            'ä' => s.push_str("ae"),
+            'ö' => s.push_str("oe"),
+            'ü' => s.push_str("ue"),
+            'Ä' => s.push_str("Ae"),
+            'Ö' => s.push_str("Oe"),
+            'Ü' => s.push_str("Ue"),
+            'ß' => s.push_str("ss"),
+            c if c.is_ascii_alphanumeric() => s.push(c),
+            _ => {
+                if !s.is_empty() && !s.ends_with('-') {
+                    s.push('-');
+                }
+            }
+        }
+    }
+    let s: String = s.trim_end_matches('-').chars().take(60).collect();
+    let s = s.trim_end_matches('-').to_string();
+    if s.is_empty() {
+        "Notiz".into()
+    } else {
+        s
+    }
+}
+
+/// Echtes Kalenderdatum im Format YYYY-MM-DD (grob: Monat 1–12, Tag 1–31)
+pub fn ist_datum(s: &str) -> bool {
+    let b = s.as_bytes();
+    if b.len() != 10 || b[4] != b'-' || b[7] != b'-' {
+        return false;
+    }
+    let zahl = |r: std::ops::Range<usize>| s[r].parse::<u32>().ok();
+    matches!((zahl(0..4), zahl(5..7), zahl(8..10)), (Some(_), Some(1..=12), Some(1..=31)))
+}
+
+pub fn hat_datum_praefix(name: &str) -> bool {
+    name.len() >= 11 && name.is_char_boundary(10) && ist_datum(&name[..10]) && name.as_bytes()[10] == b'-'
+}
+
+/// Freier Dateiname im Ordner: name.md, name-2.md, name-3.md …
+fn freier_dateiname(ordner: &Path, basis: &str) -> String {
+    let mut name = format!("{basis}.md");
+    let mut n = 2;
+    while ordner.join(&name).exists() {
+        name = format!("{basis}-{n}.md");
+        n += 1;
+    }
+    name
+}
+
+/// BOM entfernen und Zeilenenden vereinheitlichen – nur zum Lesen von Metadaten.
+fn normalisiert(inhalt: &str) -> String {
+    inhalt.trim_start_matches('\u{feff}').replace("\r\n", "\n")
+}
+
+/// Teilt (normalisierten) Inhalt in (Frontmatter inkl. Trennlinien, Rest).
+fn teile_frontmatter(inhalt: &str) -> (&str, &str) {
+    if let Some(rest) = inhalt.strip_prefix("---\n") {
+        if let Some(ende) = rest.find("\n---") {
+            let nach = &rest[ende + 4..];
+            let zeilenende = nach.find('\n').map(|i| i + 1).unwrap_or(nach.len());
+            let grenze = 4 + ende + 4 + zeilenende;
+            return (&inhalt[..grenze], &inhalt[grenze..]);
+        }
+    }
+    ("", inhalt)
+}
+
+/// Index der ersten H1-Zeile – Zeilen in Codeblöcken (``` / ~~~) zählen nicht.
+fn erste_h1<'a>(zeilen: impl Iterator<Item = &'a str>) -> Option<usize> {
+    let mut im_code: Option<&str> = None;
+    for (i, z) in zeilen.enumerate() {
+        let t = z.trim_start();
+        let zaun = if t.starts_with("```") { Some("```") } else if t.starts_with("~~~") { Some("~~~") } else { None };
+        match (im_code, zaun) {
+            (None, Some(f)) => im_code = Some(f),
+            (Some(offen), Some(f)) if offen == f => im_code = None,
+            (None, None) if z.starts_with("# ") || z == "#" => return Some(i),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn geaendert_ms(pfad: &Path) -> u64 {
+    fs::metadata(pfad)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+pub fn lies_info(pfad: &Path) -> Ergebnis<NotizInfo> {
+    let datei = pfad.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_string();
+    let inhalt = normalisiert(&fs::read_to_string(pfad).map_err(fehler)?);
+    let (frontmatter, text) = teile_frontmatter(&inhalt);
+
+    let datum = frontmatter
+        .lines()
+        .find_map(|z| z.strip_prefix("datum:"))
+        .map(|d| d.trim().trim_matches(['"', '\'']).to_string())
+        .filter(|d| ist_datum(d))
+        .or_else(|| hat_datum_praefix(&datei).then(|| datei[..10].to_string()))
+        .unwrap_or_default();
+
+    let titel = erste_h1(text.lines())
+        .and_then(|i| text.lines().nth(i))
+        .map(|z| z.trim_start_matches('#').trim().to_string())
+        .filter(|t| !t.is_empty())
+        .unwrap_or_else(|| {
+            let stamm = datei.trim_end_matches(".md");
+            let stamm = if hat_datum_praefix(stamm) { &stamm[11..] } else { stamm };
+            stamm.replace('-', " ")
+        });
+
+    Ok(NotizInfo { datei, titel, datum, geaendert: geaendert_ms(pfad) })
+}
+
+/// Schreibt erst eine versteckte Temp-Datei und ersetzt dann in einem Schritt.
+/// Wer die Datei gleichzeitig liest (Claude), sieht nie einen halben Stand.
+/// `erwartet`: Änderungszeit beim Lesen – hat sich die Datei seitdem geändert, wird abgebrochen.
+pub fn schreibe_atomar(pfad: &Path, inhalt: &str, erwartet: Option<SystemTime>) -> Ergebnis<()> {
+    let ordner = pfad.parent().ok_or("Ungültiger Pfad")?;
+    let name = pfad.file_name().and_then(|n| n.to_str()).ok_or("Ungültiger Pfad")?;
+    let tmp = ordner.join(format!(".{name}.blockbuch-tmp"));
+    let ergebnis = (|| {
+        let mut f = fs::File::create(&tmp).map_err(fehler)?;
+        f.write_all(inhalt.as_bytes()).map_err(fehler)?;
+        f.sync_all().map_err(fehler)?;
+        if let Some(t) = erwartet {
+            if fs::metadata(pfad).and_then(|m| m.modified()).ok() != Some(t) {
+                return Err("Die Notiz wurde gerade von außen geändert (z. B. von Claude). Bitte nochmal versuchen.".to_string());
+            }
+        }
+        fs::rename(&tmp, pfad).map_err(fehler)
+    })();
+    if ergebnis.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    ergebnis
+}
+
+/// Datei umbenennen, ohne je ein vorhandenes Ziel zu überschreiben. Gibt den tatsächlichen Namen zurück.
+fn umbenennen_ohne_ueberschreiben(ordner: &Path, alt: &str, basis: &str) -> Ergebnis<String> {
+    let wunsch = format!("{basis}.md");
+    // Schon passend benannt (auch als basis-2.md usw.): nichts tun
+    let hat_nummer = alt
+        .strip_prefix(&format!("{basis}-"))
+        .and_then(|r| r.strip_suffix(".md"))
+        .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()));
+    if wunsch == alt || hat_nummer {
+        return Ok(alt.to_string());
+    }
+    // Nur Groß-/Kleinschreibung anders: auf APFS dieselbe Datei – direkt umbenennen
+    if wunsch.to_lowercase() == alt.to_lowercase() {
+        fs::rename(ordner.join(alt), ordner.join(&wunsch)).map_err(fehler)?;
+        return Ok(wunsch);
+    }
+    for _ in 0..20 {
+        let neu = freier_dateiname(ordner, basis);
+        // hard_link schlägt fehl, wenn das Ziel existiert – kein Wettlauf möglich
+        match fs::hard_link(ordner.join(alt), ordner.join(&neu)) {
+            Ok(()) => {
+                fs::remove_file(ordner.join(alt)).map_err(fehler)?;
+                return Ok(neu);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(fehler(e)),
+        }
+    }
+    Err("Kein freier Dateiname gefunden.".into())
+}
+
+pub fn schule_oeffnen(root: &Path, standard_ordner: &[String]) -> Ergebnis<Vec<String>> {
+    fs::create_dir_all(root).map_err(fehler)?;
+    for name in standard_ordner {
+        pruefe_name(name)?;
+        fs::create_dir_all(root.join(name)).map_err(fehler)?;
+    }
+    ordner_liste(root)
+}
+
+pub fn ordner_erstellen(root: &Path, name: &str) -> Ergebnis<Vec<String>> {
+    let name = name.trim();
+    pruefe_name(name)?;
+    let vorhanden = ordner_liste(root)?;
+    if vorhanden.iter().any(|n| n.to_lowercase() == name.to_lowercase()) {
+        return Err(format!("Ordner „{name}“ gibt es schon."));
+    }
+    fs::create_dir(root.join(name)).map_err(fehler)?;
+    ordner_liste(root)
+}
+
+pub fn notizen_auflisten(root: &Path, ordner: &str) -> Ergebnis<Vec<NotizInfo>> {
+    let pfad = ordner_pfad(root, ordner)?;
+    let mut notizen: Vec<NotizInfo> = fs::read_dir(&pfad)
+        .map_err(fehler)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.is_file() && p.extension().is_some_and(|x| x == "md"))
+        .filter(|p| !p.file_name().and_then(|n| n.to_str()).unwrap_or(".").starts_with('.'))
+        .filter_map(|p| lies_info(&p).ok())
+        .collect();
+    // Neueste zuerst: nach Datum, bei gleichem Datum nach letzter Änderung
+    notizen.sort_by(|a, b| b.datum.cmp(&a.datum).then(b.geaendert.cmp(&a.geaendert)));
+    Ok(notizen)
+}
+
+pub fn notiz_lesen(root: &Path, ordner: &str, datei: &str) -> Ergebnis<String> {
+    fs::read_to_string(notiz_pfad(root, ordner, datei)?).map_err(fehler)
+}
+
+pub fn notiz_erstellen(root: &Path, ordner: &str, lernfeld: Option<&str>, titel: &str, datum: &str) -> Ergebnis<NotizInfo> {
+    let ordner_p = ordner_pfad(root, ordner)?;
+    let titel = titel.trim();
+    if titel.is_empty() || titel.contains(['\n', '\r']) {
+        return Err("Ungültiger Titel.".into());
+    }
+    if !ist_datum(datum) {
+        return Err(format!("Ungültiges Datum: {datum}"));
+    }
+    if let Some(lf) = lernfeld {
+        if !(lf.len() == 4 && lf.starts_with("LF") && lf[2..].chars().all(|c| c.is_ascii_digit())) {
+            return Err(format!("Ungültiges Lernfeld: {lf}"));
+        }
+    }
+    let mut inhalt = String::from("---\n");
+    if let Some(lf) = lernfeld {
+        inhalt.push_str(&format!("lernfeld: {lf}\n"));
+    }
+    inhalt.push_str(&format!("datum: {datum}\ntags: []\n---\n\n# {titel}\n\n"));
+
+    let basis = format!("{datum}-{}", slug(titel));
+    for _ in 0..20 {
+        let pfad = ordner_p.join(freier_dateiname(&ordner_p, &basis));
+        // create_new: niemals eine vorhandene Datei überschreiben
+        match fs::OpenOptions::new().write(true).create_new(true).open(&pfad) {
+            Ok(mut f) => {
+                f.write_all(inhalt.as_bytes()).map_err(fehler)?;
+                return lies_info(&pfad);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(fehler(e)),
+        }
+    }
+    Err("Kein freier Dateiname gefunden.".into())
+}
+
+pub fn notiz_umbenennen(root: &Path, ordner: &str, datei: &str, titel: &str) -> Ergebnis<NotizInfo> {
+    let titel = titel.trim();
+    if titel.is_empty() || titel.contains(['\n', '\r']) {
+        return Err("Der Titel darf nicht leer sein.".into());
+    }
+    let ordner_p = ordner_pfad(root, ordner)?;
+    let alt = notiz_pfad(root, ordner, datei)?;
+    let gelesen_um = fs::metadata(&alt).and_then(|m| m.modified()).map_err(fehler)?;
+    let roh = fs::read_to_string(&alt).map_err(fehler)?;
+
+    // Zeilenenden und BOM der Datei beibehalten
+    let nl = if roh.contains("\r\n") { "\r\n" } else { "\n" };
+    let bom = if roh.starts_with('\u{feff}') { "\u{feff}" } else { "" };
+    let inhalt = normalisiert(&roh);
+    let (frontmatter, text) = teile_frontmatter(&inhalt);
+
+    let mut zeilen: Vec<String> = text.lines().map(String::from).collect();
+    match erste_h1(text.lines()) {
+        Some(i) => zeilen[i] = format!("# {titel}"),
+        None => {
+            zeilen.insert(0, format!("# {titel}"));
+            if !frontmatter.is_empty() {
+                zeilen.insert(0, String::new());
+            }
+        }
+    }
+    let mut neu = format!("{frontmatter}{}", zeilen.join("\n"));
+    if inhalt.ends_with('\n') || zeilen.len() == 1 {
+        neu.push('\n');
+    }
+    let neu = format!("{bom}{}", neu.replace('\n', nl));
+
+    schreibe_atomar(&alt, &neu, Some(gelesen_um))?;
+
+    // Dateiname: Datum-Präfix behalten, Rest aus dem neuen Titel
+    let info = lies_info(&alt)?;
+    let praefix = if hat_datum_praefix(datei) { datei[..10].to_string() } else { info.datum };
+    let basis = if praefix.is_empty() { slug(titel) } else { format!("{praefix}-{}", slug(titel)) };
+    let neu_name = umbenennen_ohne_ueberschreiben(&ordner_p, datei, &basis)?;
+    lies_info(&ordner_p.join(neu_name))
+}
+
+pub fn notiz_loeschen(root: &Path, ordner: &str, datei: &str) -> Ergebnis<()> {
+    let pfad = notiz_pfad(root, ordner, datei)?;
+    // In den Papierkorb, nicht endgültig – lässt sich im Finder wiederherstellen
+    let mut ctx = trash::TrashContext::default();
+    #[cfg(target_os = "macos")]
+    {
+        // Direkt über macOS statt Finder-Fernsteuerung: schneller, keine Automations-Abfrage
+        use trash::macos::{DeleteMethod, TrashContextExtMacos};
+        ctx.set_delete_method(DeleteMethod::NsFileManager);
+    }
+    ctx.delete(pfad).map_err(fehler)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn testordner() -> (tempfile::TempDir, PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("Schule");
+        schule_oeffnen(&root, &["LF05-Daten".to_string()]).unwrap();
+        (tmp, root)
+    }
+
+    #[test]
+    fn slug_macht_lesbare_dateinamen() {
+        assert_eq!(slug("Subnetting & VLSM"), "Subnetting-VLSM");
+        assert_eq!(slug("Größe über alles"), "Groesse-ueber-alles");
+        assert_eq!(slug("  ??  "), "Notiz");
+    }
+
+    #[test]
+    fn datum_wird_geprueft() {
+        assert!(ist_datum("2026-10-07"));
+        assert!(!ist_datum("2026-99-99"));
+        assert!(hat_datum_praefix("2026-10-07-Joins.md"));
+        assert!(!hat_datum_praefix("Joins.md"));
+    }
+
+    #[test]
+    fn unsichere_namen_werden_abgelehnt() {
+        for name in ["../geheim", ".git", "", "a/b", "a\nb"] {
+            assert!(pruefe_name(name).is_err(), "{name:?}");
+        }
+        assert!(pruefe_name("LF05-Daten-verwalten").is_ok());
+    }
+
+    #[test]
+    fn h1_in_codeblock_zaehlt_nicht() {
+        let text = "Text\n```bash\n# pakete installieren\n```\n# Echter Titel";
+        assert_eq!(erste_h1(text.lines()), Some(4));
+        assert_eq!(erste_h1("```\n# nur Code\n```".lines()), None);
+    }
+
+    #[test]
+    fn erstellen_umbenennen_loeschen() {
+        let (_tmp, root) = testordner();
+        let n = notiz_erstellen(&root, "LF05-Daten", Some("LF05"), "SQL Joins", "2026-10-07").unwrap();
+        assert_eq!(n.datei, "2026-10-07-SQL-Joins.md");
+        assert_eq!(n.titel, "SQL Joins");
+
+        let zweite = notiz_erstellen(&root, "LF05-Daten", Some("LF05"), "SQL Joins", "2026-10-07").unwrap();
+        assert_eq!(zweite.datei, "2026-10-07-SQL-Joins-2.md");
+
+        // Umbenennen auf einen belegten Namen überschreibt nichts
+        let r = notiz_umbenennen(&root, "LF05-Daten", &zweite.datei, "SQL Joins").unwrap();
+        assert_eq!(r.datei, "2026-10-07-SQL-Joins-2.md");
+        let r = notiz_umbenennen(&root, "LF05-Daten", &r.datei, "Normalformen").unwrap();
+        assert_eq!(r.datei, "2026-10-07-Normalformen.md");
+        assert_eq!(notizen_auflisten(&root, "LF05-Daten").unwrap().len(), 2);
+        let inhalt = notiz_lesen(&root, "LF05-Daten", &r.datei).unwrap();
+        assert!(inhalt.contains("# Normalformen\n") && inhalt.contains("lernfeld: LF05"));
+    }
+
+    #[test]
+    fn umbenennen_schuetzt_code_und_zeilenenden() {
+        let (_tmp, root) = testordner();
+        let pfad = root.join("LF05-Daten/2026-10-07-Skript.md");
+        fs::write(&pfad, "---\r\ndatum: 2026-10-07\r\n---\r\n\r\n```bash\r\n# pakete installieren\r\n```\r\n").unwrap();
+        let info = lies_info(&pfad).unwrap();
+        assert_eq!(info.titel, "Skript");
+        assert_eq!(info.datum, "2026-10-07");
+
+        let r = notiz_umbenennen(&root, "LF05-Daten", "2026-10-07-Skript.md", "Setup").unwrap();
+        let inhalt = notiz_lesen(&root, "LF05-Daten", &r.datei).unwrap();
+        assert!(inhalt.contains("# pakete installieren"), "Code-Kommentar muss bleiben");
+        assert!(inhalt.contains("# Setup\r\n"), "Titel eingefügt, CRLF erhalten: {inhalt:?}");
+        assert!(!inhalt.replace("\r\n", "").contains('\n'), "keine gemischten Zeilenenden");
+    }
+
+    #[test]
+    fn umbenennen_nur_gross_klein() {
+        let (_tmp, root) = testordner();
+        let n = notiz_erstellen(&root, "LF05-Daten", None, "joins", "2026-10-07").unwrap();
+        let r = notiz_umbenennen(&root, "LF05-Daten", &n.datei, "Joins").unwrap();
+        assert_eq!(r.datei, "2026-10-07-Joins.md");
+        assert_eq!(notizen_auflisten(&root, "LF05-Daten").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn atomar_schreiben_erkennt_fremde_aenderung() {
+        let (_tmp, root) = testordner();
+        let pfad = root.join("LF05-Daten/a.md");
+        fs::write(&pfad, "alt").unwrap();
+        let alt = SystemTime::UNIX_EPOCH;
+        assert!(schreibe_atomar(&pfad, "neu", Some(alt)).is_err());
+        assert_eq!(fs::read_to_string(&pfad).unwrap(), "alt");
+        assert!(!root.join("LF05-Daten/.a.md.blockbuch-tmp").exists());
+        schreibe_atomar(&pfad, "neu", None).unwrap();
+        assert_eq!(fs::read_to_string(&pfad).unwrap(), "neu");
+    }
+
+    #[test]
+    fn ordner_doppelt_wird_abgelehnt() {
+        let (_tmp, root) = testordner();
+        ordner_erstellen(&root, "Deutsch").unwrap();
+        assert!(ordner_erstellen(&root, "deutsch").is_err());
+    }
+}

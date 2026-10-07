@@ -1,12 +1,12 @@
 // Lernfelder laut KMK-Rahmenlehrplan Fachinformatiker/in Anwendungsentwicklung (2020).
-// `ordner` ist der Ordnername in ~/Schule (ab Schritt 2).
+// `ordner` ist der Ordnername in ~/Schule – wird beim Start automatisch angelegt.
 // `id` und `ordner` NICHT mehr ändern, sobald Notizen existieren – Frontmatter und Pfade hängen daran.
 // `rlp` ist die offizielle Nummer im Rahmenlehrplan (Fachrichtungs-Lernfelder heißen dort 10a–12a).
 
 export type Lernfeld = {
   id: string;
-  kurz: string;
   rlp: string;
+  kurz: string;
   titel: string;
   ordner: string;
 };
@@ -25,3 +25,33 @@ export const LERNFELDER: Lernfeld[] = [
   { id: "LF11", rlp: "11a", kurz: "Funktionalität realisieren", titel: "Funktionalität in Anwendungen realisieren", ordner: "LF11-Funktionalitaet-realisieren" },
   { id: "LF12", rlp: "12a", kurz: "Kundenspezifische Entwicklung", titel: "Kundenspezifische Anwendungsentwicklung durchführen", ordner: "LF12-Kundenspezifische-Entwicklung" },
 ];
+
+/** Ein Eintrag in der Seitenleiste: ein echter Ordner in ~/Schule */
+export type Ordner = {
+  name: string; // Ordnername auf der Platte
+  anzeige: string;
+  nummer?: string; // "05" bei Lernfeldern
+  titel: string; // lange Bezeichnung für Kopf und Tooltip
+  lernfeld?: Lernfeld;
+};
+
+/** Ordner von der Platte mit Lernfeld-Infos anreichern; Lernfelder zuerst, dann eigene Fächer */
+export function ordnerAusNamen(namen: string[]): { lernfelder: Ordner[]; faecher: Ordner[] } {
+  const lernfelder: Ordner[] = [];
+  const faecher: Ordner[] = [];
+  const vergleich = (s: string) => s.normalize("NFC").toLowerCase();
+  const vergeben = new Set<string>();
+  for (const lf of LERNFELDER) {
+    const name = namen.find((n) => vergleich(n) === vergleich(lf.ordner));
+    if (name) {
+      vergeben.add(name);
+      lernfelder.push({ name, anzeige: lf.kurz, nummer: lf.id.slice(2), titel: lf.titel, lernfeld: lf });
+    }
+  }
+  for (const name of namen) {
+    const anzeige = name.normalize("NFC");
+    if (!vergeben.has(name)) faecher.push({ name, anzeige, titel: anzeige });
+  }
+  faecher.sort((a, b) => a.anzeige.localeCompare(b.anzeige, "de"));
+  return { lernfelder, faecher };
+}
