@@ -143,7 +143,9 @@ pub fn run() {
 
             // ~/Schule beobachten, damit Änderungen von Claude sofort sichtbar werden
             let root = schule_pfad(h)?;
-            std::fs::create_dir_all(&root)?;
+            if let Err(e) = std::fs::create_dir_all(&root) {
+                eprintln!("[blockbuch] ~/Schule konnte nicht angelegt werden: {e}");
+            }
             match beobachter::starten(h.clone(), root) {
                 Ok(b) => {
                     app.manage(b);

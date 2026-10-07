@@ -52,6 +52,8 @@ pub fn starten(app: tauri::AppHandle, root: PathBuf) -> Result<Beobachter, Strin
 
 /// Beobachtet `root` und ruft `melden` mit gesammelten Änderungen auf (alle 200 ms höchstens einmal)
 fn beobachten(root: PathBuf, melden: impl Fn(Vec<Aenderung>) + Send + 'static) -> Result<Beobachter, String> {
+    // macOS meldet echte Pfade (Symlinks aufgelöst, z. B. bei iCloud) – also auch so vergleichen
+    let root = root.canonicalize().unwrap_or(root);
     let root_kopie = root.clone();
     let mut debouncer = new_debouncer(Duration::from_millis(200), move |ergebnis: DebounceEventResult| {
         let Ok(ereignisse) = ergebnis else { return };
@@ -92,8 +94,8 @@ mod tests {
     #[test]
     fn echte_dateiaenderungen_werden_gemeldet() {
         let tmp = tempfile::tempdir().unwrap();
-        // macOS meldet echte Pfade (/private/var/… statt /var/…)
-        let root = tmp.path().canonicalize().unwrap().join("Schule");
+        // bewusst NICHT kanonisiert (/var/… statt /private/var/…) – beobachten() muss das selbst lösen
+        let root = tmp.path().join("Schule");
         std::fs::create_dir_all(root.join("LF05")).unwrap();
         let (tx, rx) = std::sync::mpsc::channel();
         let _b = beobachten(root.clone(), move |a| {

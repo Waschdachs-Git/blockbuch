@@ -317,7 +317,17 @@ pub fn notiz_konfliktkopie(root: &Path, ordner: &str, datei: &str, inhalt: &str,
     if uhrzeit.len() != 4 || !uhrzeit.chars().all(|c| c.is_ascii_digit()) {
         return Err(format!("Ungültige Uhrzeit: {uhrzeit}"));
     }
-    let ordner_p = ordner_pfad(root, ordner)?;
+    pruefe_name(ordner)?;
+    // Darf nie scheitern: gibt es den Ordner nicht mehr (z. B. von Claude umbenannt/gelöscht),
+    // landet die Kopie in ~/Schule/Gerettet
+    let ordner_p = match ordner_pfad(root, ordner) {
+        Ok(p) => p,
+        Err(_) => {
+            let p = root.join("Gerettet");
+            fs::create_dir_all(&p).map_err(fehler)?;
+            p
+        }
+    };
     let stamm = datei.trim_end_matches(".md");
     let basis = format!("{stamm}-konflikt-{uhrzeit}");
     for _ in 0..20 {
@@ -551,6 +561,10 @@ mod tests {
         // Eigene Änderungszeit stimmt mit der Datei überein
         let t = notiz_speichern(&root, "LF05-Daten", &kopie, "neu", None).unwrap();
         assert_eq!(t, notiz_lesen(&root, "LF05-Daten", &kopie).unwrap().geaendert);
+
+        // Ordner verschwunden: Kopie landet in "Gerettet"
+        let g = notiz_konfliktkopie(&root, "Gibt-es-nicht", "2026-10-07-X.md", "Text", "1043").unwrap();
+        assert!(root.join("Gerettet").join(&g).exists());
 
         // Gelöschte Datei wird beim Speichern nicht wieder angelegt
         fs::remove_file(root.join("LF05-Daten").join(&n.datei)).unwrap();

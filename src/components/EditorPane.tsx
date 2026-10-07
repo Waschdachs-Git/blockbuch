@@ -26,7 +26,13 @@ type Props = {
   onFehler: (e: unknown) => void;
 };
 
-type Geoeffnet = { ordner: string; datei: string; teile: NotizDatei; geaendert: number };
+type Geoeffnet = {
+  ordner: string;
+  datei: string;
+  teile: NotizDatei;
+  geaendert: number; // Änderungszeit (ms) vom letzten Lesen/Speichern
+  inhalt: string; // Dateiinhalt vom letzten Lesen/Speichern – erkennt Änderungen auch bei gleicher Zeit
+};
 type Status = "gespeichert" | "ungespeichert" | "speichert" | "fehler";
 
 export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurueck, onFehler }: Props) {
@@ -40,6 +46,9 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   // kurzer Hinweis oben rechts, wenn eine Änderung von außen übernommen wurde
   const [vonAussen, setVonAussen] = useState(false);
   const flaecheRef = useRef<HTMLDivElement>(null);
+  const vonAussenTimer = useRef<number | undefined>(undefined);
+  // Gestartete, noch nicht abgeschlossene Speichervorgänge (zählt schon beim Aufruf, nicht erst beim Ausführen)
+  const ausstehend = useRef(0);
 
   const geoeffnet = useRef<Geoeffnet | null>(null);
   const geaendert = useRef(false); // ungespeicherte Änderungen im Editor
@@ -81,6 +90,13 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     },
   });
 
+  /** Schritt hinten an die Warteschlange hängen. Ein Fehler in einem Schritt wird gemeldet,
+   *  blockiert aber nie die folgenden (sonst würde danach nichts mehr gespeichert). */
+  function einreihen(schritt: () => Promise<void>): Promise<void> {
+    laufend.current = laufend.current.then(schritt).catch((e) => cb.current.onFehler(e));
+    return laufend.current;
+  }
+
   /** Eigene Version als Konfliktkopie neben die Notiz legen – getippter Text wird nie still verworfen */
   async function kopieAnlegen(ziel: Geoeffnet, inhalt: string) {
     const d = new Date();
@@ -105,7 +121,18 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     setStatus("speichert");
 
     // Speichervorgänge nacheinander, damit jeder die Änderungszeit des vorigen kennt
-    laufend.current = laufend.current.then(async () => {
+    ausstehend.current++;
+    return einreihen(async () => {
+      try {
+        await speichernAusfuehren(ziel, text, erzwingen);
+      } finally {
+        ausstehend.current--;
+      }
+    });
+  }
+
+  async function speichernAusfuehren(ziel: Geoeffnet, text: string, erzwingen: boolean) {
+    {
       let erwartet: number | null = ziel.geaendert;
       if (erzwingen) {
         // Bewusst überschreiben: aktuelles Frontmatter von der Platte übernehmen (z. B. neue Tags von Claude)
@@ -119,6 +146,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
       const inhalt = setzeZusammen(ziel.teile, text);
       try {
         ziel.geaendert = await api.notizSpeichern(ziel.ordner, ziel.datei, inhalt, erwartet);
+        ziel.inhalt = inhalt;
         if (geoeffnet.current === ziel) {
           setKonflikt(null);
           setStatus(geaendert.current ? "ungespeichert" : "gespeichert");
@@ -137,8 +165,20 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
           cb.current.onFehler(`„${ziel.datei}“ konnte nicht gespeichert werden: ${fehlerText(e)}`);
         }
       }
-    });
-    return laufend.current;
+    }
+  }
+
+  /** Inhalt in den Editor setzen, OHNE Eintrag im Rückgängig-Verlauf – sonst holt ⌘Z den alten
+   *  Stand (oder die vorige Notiz) zurück und das Autosave überschreibt damit die Datei. */
+  function inhaltSetzen(text: string) {
+    editor
+      ?.chain()
+      .command(({ tr }) => {
+        tr.setMeta("addToHistory", false);
+        return true;
+      })
+      .setContent(text, { contentType: "markdown", emitUpdate: false })
+      .run();
   }
 
   /** Vor dem Verlassen der Notiz (Wechsel, Umbenennen, Beenden): speichern –
@@ -148,8 +188,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     if (editor && ziel && geaendert.current && konfliktRef.current) {
       const inhalt = setzeZusammen(ziel.teile, editor.getMarkdown());
       geaendert.current = false;
-      laufend.current = laufend.current.then(() => kopieAnlegen(ziel, inhalt));
-      return laufend.current;
+      return einreihen(() => kopieAnlegen(ziel, inhalt));
     }
     return speichern();
   }
@@ -161,8 +200,8 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     // Inzwischen eine andere Notiz gewählt? Dann diese Antwort verwerfen
     if (nr !== ladeNr.current || !editor) return;
     const teile = zerlege(inhalt);
-    geoeffnet.current = { ordner: o, datei: d, teile, geaendert: zeit };
-    editor.commands.setContent(teile.text, { contentType: "markdown", emitUpdate: false });
+    geoeffnet.current = { ordner: o, datei: d, teile, geaendert: zeit, inhalt };
+    inhaltSetzen(teile.text);
     const riskant = wuerdeInhaltVerlieren(teile.text, aufraeumen(editor.getMarkdown()));
     setSchreibschutz(riskant);
     editor.setEditable(!riskant, false);
@@ -180,7 +219,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
    *  behalten. Mit ungespeicherten Eingaben: sofort Konflikt anzeigen (nichts wird überschrieben). */
   function externGeaendert(): Promise<void> {
     // Hinter laufende Speichervorgänge einreihen – so kennen wir die Änderungszeit des eigenen Schreibens
-    laufend.current = laufend.current.then(async () => {
+    return einreihen(async () => {
       const ziel = geoeffnet.current;
       if (!editor || !ziel) return;
       let gelesen;
@@ -190,9 +229,14 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
         return; // gelöscht/umbenannt: darum kümmert sich die Notizliste (und sichert ggf. als Kopie)
       }
       if (geoeffnet.current !== ziel) return;
-      if (gelesen.geaendert === ziel.geaendert) return; // unser eigenes Speichern
+      // Unverändert (z. B. unser eigenes Speichern) – am Inhalt erkannt, nicht nur an der Zeit
+      if (gelesen.inhalt === ziel.inhalt) {
+        ziel.geaendert = gelesen.geaendert;
+        return;
+      }
 
-      if (geaendert.current) {
+      // Ungespeicherte Eingaben oder ein schon gestartetes Speichern: nichts überschreiben → Konflikt
+      if (geaendert.current || ausstehend.current > 0) {
         window.clearTimeout(timer.current);
         setStatus("fehler");
         setKonflikt("Die Notiz wurde gerade von außen geändert (z. B. von Claude).");
@@ -206,7 +250,8 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
       const teile = zerlege(gelesen.inhalt);
       ziel.teile = teile;
       ziel.geaendert = gelesen.geaendert;
-      editor.commands.setContent(teile.text, { contentType: "markdown", emitUpdate: false });
+      ziel.inhalt = gelesen.inhalt;
+      inhaltSetzen(teile.text);
       const ende = editor.state.doc.content.size;
       editor.commands.setTextSelection({ from: Math.min(from, ende), to: Math.min(to, ende) });
       if (fokus) editor.commands.focus(undefined, { scrollIntoView: false });
@@ -218,9 +263,9 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
       setKonflikt(null);
       setStatus("gespeichert");
       setVonAussen(true);
-      window.setTimeout(() => setVonAussen(false), 2500);
+      window.clearTimeout(vonAussenTimer.current);
+      vonAussenTimer.current = window.setTimeout(() => setVonAussen(false), 2500);
     });
-    return laufend.current;
   }
 
   // Notiz wechseln: alte sichern, neue laden
@@ -228,6 +273,8 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     if (!editor) return;
     sichernVorWeggang();
     geoeffnet.current = null;
+    window.clearTimeout(vonAussenTimer.current);
+    setVonAussen(false);
     ladeNr.current++; // laufende Ladevorgänge ungültig machen
     editor.setEditable(false, false);
     setLadeFehler(null);

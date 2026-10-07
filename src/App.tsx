@@ -57,29 +57,19 @@ function App() {
   const aktiveDateiRef = useRef(aktiveDatei);
   aktiveDateiRef.current = aktiveDatei;
 
-  async function ladeNachExtern(name: string) {
-    const vorher = new Set(notizenRef.current.map((n) => n.datei));
-    const liste = await api.notizenAuflisten(name);
-    if (name !== aktuellerOrdnerRef.current) return;
-    setNotizen(liste);
-    setUmbenennenDatei((d) => (d && liste.some((n) => n.datei === d) ? d : null));
-    setAktiveDatei((bisher) => {
-      if (bisher && liste.some((n) => n.datei === bisher)) return bisher;
-      // Offene Notiz ist verschwunden: genau eine neue Datei → wurde wohl umbenannt (z. B. von Claude)
-      const neu = liste.filter((n) => !vorher.has(n.datei));
-      return neu.length === 1 ? neu[0].datei : (liste[0]?.datei ?? null);
-    });
-  }
-
   const externRef = useRef<(a: Aenderung[]) => void>(() => {});
   externRef.current = (aenderungen) => {
     const ordnerName = aktuellerOrdnerRef.current;
-    if (aenderungen.some((a) => a.datei === null)) {
+    const gleich = (a: string | null, b: string | null) => (a ?? "").normalize("NFC") === (b ?? "").normalize("NFC");
+    // ordner === null: ~/Schule selbst (z. B. Neuabgleich nach git checkout) – dann alles neu prüfen
+    const alles = aenderungen.some((a) => a.ordner === null);
+    if (alles || aenderungen.some((a) => a.datei === null)) {
       api.ordnerAuflisten().then(setOrdnerNamen).catch(melde);
     }
-    if (ordnerName && aenderungen.some((a) => a.ordner === ordnerName)) {
-      ladeNachExtern(ordnerName).catch(melde);
-      if (aenderungen.some((a) => a.ordner === ordnerName && a.datei === aktiveDateiRef.current)) {
+    const imOrdner = aenderungen.filter((a) => gleich(a.ordner, ordnerName));
+    if (ordnerName && (alles || imOrdner.length > 0)) {
+      ladeNotizen(ordnerName).catch(melde);
+      if (alles || imOrdner.some((a) => a.datei === null || gleich(a.datei, aktiveDateiRef.current))) {
         editorRef.current?.externGeaendert();
       }
     }
@@ -105,38 +95,40 @@ function App() {
       .catch(melde);
   }, [melde]);
 
-  const ladeNotizen = useCallback(
-    async (name: string, auswahl?: string | null) => {
-      const liste = await api.notizenAuflisten(name);
-      if (name !== aktuellerOrdnerRef.current) return liste;
-      setNotizen(liste);
-      setAktiveDatei((bisher) => {
-        const wunsch = auswahl !== undefined ? auswahl : bisher;
-        return liste.some((n) => n.datei === wunsch) ? wunsch! : (liste[0]?.datei ?? null);
-      });
-      return liste;
-    },
-    [],
-  );
+  // Notizliste laden – alle Ladevorgänge nummeriert, nur die neueste Antwort zählt.
+  // `auswahl` (z. B. neu angelegte Notiz) wird gemerkt, bis eine Antwort sie anwendet.
+  const listenNr = useRef(0);
+  const auswahlWunsch = useRef<string | null | undefined>(undefined);
+  const ladeNotizen = useCallback(async (name: string, auswahl?: string | null) => {
+    const nr = ++listenNr.current;
+    if (auswahl !== undefined) auswahlWunsch.current = auswahl;
+    const vorher = new Set(notizenRef.current.map((n) => n.datei));
+    const liste = await api.notizenAuflisten(name);
+    if (nr !== listenNr.current || name !== aktuellerOrdnerRef.current) return liste;
+    const wunsch = auswahlWunsch.current;
+    auswahlWunsch.current = undefined;
+    setNotizen(liste);
+    setUmbenennenDatei((d) => (d && liste.some((n) => n.datei === d) ? d : null));
+    setAktiveDatei((bisher) => {
+      const ziel = wunsch !== undefined ? wunsch : bisher;
+      if (ziel && liste.some((n) => n.datei === ziel)) return ziel;
+      if (wunsch === undefined && bisher) {
+        // Offene Notiz ist verschwunden: genau eine neue Datei → wurde wohl umbenannt (z. B. von Claude)
+        const neu = liste.filter((n) => !vorher.has(n.datei));
+        if (neu.length === 1) return neu[0].datei;
+      }
+      return liste[0]?.datei ?? null;
+    });
+    return liste;
+  }, []);
 
   // Ordnerwechsel: Notizen laden, erste Notiz auswählen
   useEffect(() => {
     if (!ordner) return;
     aktuellerOrdnerRef.current = ordner.name;
-    let abgebrochen = false;
     setUmbenennenDatei(null);
-    api
-      .notizenAuflisten(ordner.name)
-      .then((liste) => {
-        if (abgebrochen) return;
-        setNotizen(liste);
-        setAktiveDatei(liste[0]?.datei ?? null);
-      })
-      .catch(melde);
-    return () => {
-      abgebrochen = true;
-    };
-  }, [ordner?.name, melde]);
+    ladeNotizen(ordner.name, null).catch(melde);
+  }, [ordner?.name, ladeNotizen, melde]);
 
   const legtNotizAn = useRef(false);
   const neueNotiz = useCallback(async () => {

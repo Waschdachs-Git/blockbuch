@@ -61,6 +61,7 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
         .map(([d, c]) => info(d, c))
         .sort((x, y) => y.datum.localeCompare(x.datum));
     case "notiz_lesen":
+      if (fs[a.ordner]?.[a.datei] === undefined) throw `Datei „${a.datei}“ gibt es nicht.`;
       return { inhalt: fs[a.ordner][a.datei], geaendert: zeiten[`${a.ordner}/${a.datei}`] ?? 1 };
     case "notiz_speichern": {
       const k = `${a.ordner}/${a.datei}`;
