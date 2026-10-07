@@ -1,13 +1,8 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import { TaskItem, TaskList } from "@tiptap/extension-list";
-import { TableKit } from "@tiptap/extension-table";
-import { Placeholder } from "@tiptap/extensions";
-import { Markdown } from "@tiptap/markdown";
-import Image from "@tiptap/extension-image";
 import { api, fehlerText, istKonflikt } from "../api";
 import { aufraeumen, setzeZusammen, wuerdeInhaltVerlieren, zerlege, type NotizDatei } from "../editor/datei";
+import { editorErweiterungen } from "../editor/erweiterungen";
 import { SLASH_GESCHLOSSEN, SlashMenu, slashErweiterung, type SlashZustand } from "../editor/slashMenu";
 
 const AUTOSAVE_MS = 500;
@@ -15,7 +10,7 @@ const AUTOSAVE_MS = 500;
 export type EditorHandle = {
   /** Cursor in den Editor setzen (ans Ende des Textes) */
   fokus: () => void;
-  /** Ungespeicherte Änderungen sofort schreiben – vor Umbenennen/Löschen aufrufen */
+  /** Ungespeicherte Änderungen sofort sichern – vor Umbenennen, Löschen und Beenden aufrufen */
   speichernJetzt: () => Promise<void>;
 };
 
@@ -46,6 +41,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   const timer = useRef<number | undefined>(undefined);
   const fokusNachLaden = useRef(false);
   const laufend = useRef<Promise<void>>(Promise.resolve());
+  const ladeNr = useRef(0);
   const slashRef = useRef(slash);
   slashRef.current = slash;
   // Callbacks aktuell halten, ohne den Editor neu zu bauen
@@ -55,19 +51,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   konfliktRef.current = konflikt;
 
   const editor = useEditor({
-    extensions: [
-      // Unterstreichen aus: Markdown kennt es nicht, und "++" würde "C++ und i++" zerstören
-      StarterKit.configure({ underline: false, link: { openOnClick: false, autolink: true } }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      TableKit.configure({ table: { resizable: false } }),
-      Image,
-      Placeholder.configure({
-        placeholder: ({ node }) => (node.type.name === "heading" ? "Überschrift" : "Schreib los … oder tippe / für Blöcke"),
-      }),
-      Markdown.configure({ indentation: { style: "space", size: 2 } }),
-      slashErweiterung(setSlash),
-    ],
+    extensions: [...editorErweiterungen(), slashErweiterung(setSlash)],
     editorProps: {
       attributes: { class: "inhalt", spellcheck: "true", lang: "de", "aria-label": "Notiz-Text" },
       handleKeyDown: (_view, event) => {
@@ -92,20 +76,44 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     },
   });
 
-  /** Speichert den aktuellen Editor-Inhalt in die geöffnete Datei. Der Inhalt wird sofort
+  /** Eigene Version als Konfliktkopie neben die Notiz legen – getippter Text wird nie still verworfen */
+  async function kopieAnlegen(ziel: Geoeffnet, inhalt: string) {
+    const d = new Date();
+    const uhrzeit = `${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
+    try {
+      const name = await api.notizKonfliktkopie(ziel.ordner, ziel.datei, inhalt, uhrzeit);
+      cb.current.onFehler(`Konflikt bei „${ziel.datei}“: Deine Version wurde als „${name}“ daneben gesichert.`);
+      cb.current.onGespeichert();
+    } catch (e) {
+      cb.current.onFehler(`„${ziel.datei}“: Deine Änderungen konnten nicht gesichert werden: ${fehlerText(e)}`);
+    }
+  }
+
+  /** Speichert den aktuellen Editor-Inhalt in die geöffnete Datei. Der Text wird sofort
    *  (synchron) gelesen – so landet er auch beim Notizwechsel in der richtigen Datei. */
   function speichern(erzwingen = false): Promise<void> {
     window.clearTimeout(timer.current);
     const ziel = geoeffnet.current;
     if (!editor || !ziel || (!geaendert.current && !erzwingen)) return laufend.current;
-    const inhalt = setzeZusammen(ziel.teile, editor.getMarkdown());
+    const text = editor.getMarkdown();
     geaendert.current = false;
     setStatus("speichert");
 
     // Speichervorgänge nacheinander, damit jeder die Änderungszeit des vorigen kennt
     laufend.current = laufend.current.then(async () => {
+      let erwartet: number | null = ziel.geaendert;
+      if (erzwingen) {
+        // Bewusst überschreiben: aktuelles Frontmatter von der Platte übernehmen (z. B. neue Tags von Claude)
+        try {
+          ziel.teile = zerlege((await api.notizLesen(ziel.ordner, ziel.datei)).inhalt);
+        } catch {
+          // Datei gibt es nicht mehr – mit bekanntem Frontmatter neu schreiben
+        }
+        erwartet = null;
+      }
+      const inhalt = setzeZusammen(ziel.teile, text);
       try {
-        ziel.geaendert = await api.notizSpeichern(ziel.ordner, ziel.datei, inhalt, erzwingen ? null : ziel.geaendert);
+        ziel.geaendert = await api.notizSpeichern(ziel.ordner, ziel.datei, inhalt, erwartet);
         if (geoeffnet.current === ziel) {
           setKonflikt(null);
           setStatus(geaendert.current ? "ungespeichert" : "gespeichert");
@@ -117,6 +125,9 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
           setStatus("fehler");
           if (istKonflikt(e)) setKonflikt(fehlerText(e));
           else cb.current.onFehler(e);
+        } else if (istKonflikt(e)) {
+          // Notiz ist schon nicht mehr offen: Text als Kopie sichern statt verlieren
+          await kopieAnlegen(ziel, inhalt);
         } else {
           cb.current.onFehler(`„${ziel.datei}“ konnte nicht gespeichert werden: ${fehlerText(e)}`);
         }
@@ -125,10 +136,26 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     return laufend.current;
   }
 
+  /** Vor dem Verlassen der Notiz (Wechsel, Umbenennen, Beenden): speichern –
+   *  oder bei offenem Konflikt die eigene Version als Kopie sichern. */
+  function sichernVorWeggang(): Promise<void> {
+    const ziel = geoeffnet.current;
+    if (editor && ziel && geaendert.current && konfliktRef.current) {
+      const inhalt = setzeZusammen(ziel.teile, editor.getMarkdown());
+      geaendert.current = false;
+      laufend.current = laufend.current.then(() => kopieAnlegen(ziel, inhalt));
+      return laufend.current;
+    }
+    return speichern();
+  }
+
   async function laden(o: string, d: string) {
+    const nr = ++ladeNr.current;
+    editor?.setEditable(false, false); // während des Ladens nichts tippen, was verloren ginge
     const { inhalt, geaendert: zeit } = await api.notizLesen(o, d);
+    // Inzwischen eine andere Notiz gewählt? Dann diese Antwort verwerfen
+    if (nr !== ladeNr.current || !editor) return;
     const teile = zerlege(inhalt);
-    if (!editor) return;
     geoeffnet.current = { ordner: o, datei: d, teile, geaendert: zeit };
     editor.commands.setContent(teile.text, { contentType: "markdown", emitUpdate: false });
     const riskant = wuerdeInhaltVerlieren(teile.text, aufraeumen(editor.getMarkdown()));
@@ -147,8 +174,10 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   // Notiz wechseln: alte sichern, neue laden
   useEffect(() => {
     if (!editor) return;
-    if (geaendert.current && !konfliktRef.current) speichern();
+    sichernVorWeggang();
     geoeffnet.current = null;
+    ladeNr.current++; // laufende Ladevorgänge ungültig machen
+    editor.setEditable(false, false);
     setLadeFehler(null);
     setKonflikt(null);
     if (!datei) {
@@ -167,14 +196,14 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   }, [editor, ordner, datei, version]);
 
   // Beim Schließen der Ansicht nichts verlieren
-  useEffect(() => () => void speichern(), [editor]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => void sichernVorWeggang(), [editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useImperativeHandle(ref, () => ({
     fokus: () => {
       if (geoeffnet.current) editor?.commands.focus("end");
       else fokusNachLaden.current = true;
     },
-    speichernJetzt: () => speichern(),
+    speichernJetzt: () => sichernVorWeggang(),
   }));
 
   const statusText: Record<Status, string> = {

@@ -6,7 +6,28 @@ mod notizen;
 use notizen::{Ergebnis, NotizInfo, NotizInhalt};
 use serde::Serialize;
 use std::path::PathBuf;
-use tauri::Manager;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+use tauri::menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::{Emitter, Manager};
+
+/// Erst wenn die Oberfläche alles gesichert hat (oder die Frist abgelaufen ist), darf die App beenden.
+static BEENDEN_ERLAUBT: AtomicBool = AtomicBool::new(false);
+/// Ereignis an die Oberfläche: "Bitte jetzt alles sichern, dann `beenden` aufrufen"
+const BEENDEN_ANGEFRAGT: &str = "beenden-angefragt";
+
+fn beenden_anfragen(app: &tauri::AppHandle) {
+    eprintln!("[blockbuch] Beenden angefragt – Oberfläche sichert");
+    let _ = app.emit(BEENDEN_ANGEFRAGT, ());
+    // Sicherheitsnetz: hängt die Oberfläche, trotzdem nach 3 s beenden
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(3));
+        eprintln!("[blockbuch] Frist abgelaufen – beende ohne Rückmeldung der Oberfläche");
+        BEENDEN_ERLAUBT.store(true, Ordering::SeqCst);
+        app.exit(0);
+    });
+}
 
 #[derive(Serialize)]
 struct SchuleInfo {
@@ -53,6 +74,25 @@ async fn notiz_speichern(
 }
 
 #[tauri::command]
+async fn notiz_konfliktkopie(
+    app: tauri::AppHandle,
+    ordner: String,
+    datei: String,
+    inhalt: String,
+    uhrzeit: String,
+) -> Ergebnis<String> {
+    notizen::notiz_konfliktkopie(&schule_pfad(&app)?, &ordner, &datei, &inhalt, &uhrzeit)
+}
+
+/// Von der Oberfläche aufgerufen, nachdem alles gesichert ist
+#[tauri::command]
+fn beenden(app: tauri::AppHandle) {
+    eprintln!("[blockbuch] Oberfläche hat gesichert – beende");
+    BEENDEN_ERLAUBT.store(true, Ordering::SeqCst);
+    app.exit(0);
+}
+
+#[tauri::command]
 async fn notiz_erstellen(
     app: tauri::AppHandle,
     ordner: String,
@@ -83,10 +123,66 @@ pub fn run() {
             notizen_auflisten,
             notiz_lesen,
             notiz_speichern,
+            notiz_konfliktkopie,
+            beenden,
             notiz_erstellen,
             notiz_umbenennen,
             notiz_loeschen
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        // Eigenes Menü: ⌘Q läuft über "beenden_anfragen" statt macOS direkt beenden zu lassen
+        // (das Standard-"Beenden" schließt die App sofort, ohne dass die Oberfläche speichern kann)
+        .setup(|app| {
+            let h = app.handle();
+            let beenden = MenuItemBuilder::with_id("beenden", "Blockbuch beenden")
+                .accelerator("CmdOrCtrl+Q")
+                .build(h)?;
+            let app_menue = SubmenuBuilder::new(h, "Blockbuch")
+                .about(None)
+                .separator()
+                .services()
+                .separator()
+                .hide()
+                .hide_others()
+                .show_all()
+                .separator()
+                .item(&beenden)
+                .build()?;
+            let bearbeiten = SubmenuBuilder::new(h, "Bearbeiten")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .build()?;
+            let fenster = SubmenuBuilder::new(h, "Fenster").minimize().close_window().build()?;
+            app.set_menu(MenuBuilder::new(h).items(&[&app_menue, &bearbeiten, &fenster]).build()?)?;
+            Ok(())
+        })
+        .on_menu_event(|app, ereignis| {
+            if ereignis.id() == "beenden" {
+                beenden_anfragen(app);
+            }
+        })
+        // Fenster schließen (roter Knopf, ⌘W): erst sichern lassen
+        .on_window_event(|fenster, ereignis| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = ereignis {
+                if !BEENDEN_ERLAUBT.load(Ordering::SeqCst) {
+                    api.prevent_close();
+                    beenden_anfragen(fenster.app_handle());
+                }
+            }
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        // ⌘Q / Beenden aus dem Menü oder Dock: ebenfalls erst sichern lassen
+        .run(|app, ereignis| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = ereignis {
+                if !BEENDEN_ERLAUBT.load(Ordering::SeqCst) {
+                    api.prevent_exit();
+                    beenden_anfragen(app);
+                }
+            }
+        });
 }

@@ -69,6 +69,16 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
       fs[a.ordner][d] = c;
       return info(d, c);
     }
+    case "notiz_konfliktkopie": {
+      const d = frei(a.ordner, `${a.datei.replace(/\.md$/, "")}-konflikt-${a.uhrzeit}`);
+      fs[a.ordner][d] = a.inhalt;
+      return d;
+    }
+    case "beenden":
+      console.info("[Simulation] App würde jetzt beenden");
+      return null;
+    case "plugin:event|listen":
+      return 0;
     case "notiz_loeschen":
       delete fs[a.ordner][a.datei];
       return null;
@@ -78,6 +88,8 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
 
 // @ts-expect-error – interne Tauri-Schnittstelle, die @tauri-apps/api aufruft
 window.__TAURI_INTERNALS__ = { invoke, transformCallback: () => 0 };
+// für listen()/unlisten() aus @tauri-apps/api/event
+(window as unknown as Record<string, unknown>).__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
 // Für Tests im Browser einsehbar
 // @ts-expect-error – Debug-Zugriff
 window.__blockbuchFs = fs;

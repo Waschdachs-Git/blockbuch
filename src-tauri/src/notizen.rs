@@ -195,14 +195,24 @@ pub fn lies_info(pfad: &Path) -> Ergebnis<NotizInfo> {
 /// Schreibt erst eine versteckte Temp-Datei und ersetzt dann in einem Schritt.
 /// Wer die Datei gleichzeitig liest (Claude), sieht nie einen halben Stand.
 /// `erwartet`: Änderungszeit (ms) beim Lesen – hat sich die Datei seitdem geändert, wird abgebrochen.
-pub fn schreibe_atomar(pfad: &Path, inhalt: &str, erwartet: Option<u64>) -> Ergebnis<()> {
+/// Gibt die Änderungszeit (ms) der geschriebenen Datei zurück – genommen *vor* dem Ersetzen,
+/// damit eine Änderung von außen direkt danach nicht für die eigene gehalten wird.
+pub fn schreibe_atomar(pfad: &Path, inhalt: &str, erwartet: Option<u64>) -> Ergebnis<u64> {
     let ordner = pfad.parent().ok_or("Ungültiger Pfad")?;
     let name = pfad.file_name().and_then(|n| n.to_str()).ok_or("Ungültiger Pfad")?;
-    let tmp = ordner.join(format!(".{name}.blockbuch-tmp"));
+    let tmp = ordner.join(format!(".{name}.{}.blockbuch-tmp", std::process::id()));
     let ergebnis = (|| {
         let mut f = fs::File::create(&tmp).map_err(fehler)?;
         f.write_all(inhalt.as_bytes()).map_err(fehler)?;
         f.sync_all().map_err(fehler)?;
+        // rename behält die Änderungszeit bei
+        let geschrieben = f
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
         if let Some(t) = erwartet {
             if !pfad.exists() {
                 return Err(format!("{KONFLIKT} Die Notiz gibt es nicht mehr (gelöscht oder umbenannt)."));
@@ -211,7 +221,8 @@ pub fn schreibe_atomar(pfad: &Path, inhalt: &str, erwartet: Option<u64>) -> Erge
                 return Err(format!("{KONFLIKT} Die Notiz wurde gerade von außen geändert (z. B. von Claude)."));
             }
         }
-        fs::rename(&tmp, pfad).map_err(fehler)
+        fs::rename(&tmp, pfad).map_err(fehler)?;
+        Ok(geschrieben)
     })();
     if ergebnis.is_err() {
         let _ = fs::remove_file(&tmp);
@@ -296,8 +307,32 @@ pub fn notiz_lesen(root: &Path, ordner: &str, datei: &str) -> Ergebnis<NotizInha
 /// `None` überschreibt bewusst (nur nach Rückfrage beim Konflikt).
 pub fn notiz_speichern(root: &Path, ordner: &str, datei: &str, inhalt: &str, erwartet: Option<u64>) -> Ergebnis<u64> {
     let pfad = notiz_pfad(root, ordner, datei)?;
-    schreibe_atomar(&pfad, inhalt, erwartet)?;
-    Ok(geaendert_ms(&pfad))
+    schreibe_atomar(&pfad, inhalt, erwartet)
+}
+
+/// Sichert die eigene Version bei einem Konflikt als neue Datei neben dem Original
+/// (z. B. "2026-10-07-Joins-konflikt-1042.md"). Überschreibt nie etwas. Gibt den Dateinamen zurück.
+pub fn notiz_konfliktkopie(root: &Path, ordner: &str, datei: &str, inhalt: &str, uhrzeit: &str) -> Ergebnis<String> {
+    pruefe_name(datei)?;
+    if uhrzeit.len() != 4 || !uhrzeit.chars().all(|c| c.is_ascii_digit()) {
+        return Err(format!("Ungültige Uhrzeit: {uhrzeit}"));
+    }
+    let ordner_p = ordner_pfad(root, ordner)?;
+    let stamm = datei.trim_end_matches(".md");
+    let basis = format!("{stamm}-konflikt-{uhrzeit}");
+    for _ in 0..20 {
+        let name = freier_dateiname(&ordner_p, &basis);
+        match fs::OpenOptions::new().write(true).create_new(true).open(ordner_p.join(&name)) {
+            Ok(mut f) => {
+                f.write_all(inhalt.as_bytes()).map_err(fehler)?;
+                f.sync_all().map_err(fehler)?;
+                return Ok(name);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(fehler(e)),
+        }
+    }
+    Err("Kein freier Dateiname gefunden.".into())
 }
 
 pub fn notiz_erstellen(root: &Path, ordner: &str, lernfeld: Option<&str>, titel: &str, datum: &str) -> Ergebnis<NotizInfo> {
@@ -484,7 +519,10 @@ mod tests {
         fs::write(&pfad, "alt").unwrap();
         assert!(schreibe_atomar(&pfad, "neu", Some(1)).unwrap_err().starts_with(KONFLIKT));
         assert_eq!(fs::read_to_string(&pfad).unwrap(), "alt");
-        assert!(!root.join("LF05-Daten/.a.md.blockbuch-tmp").exists());
+        let reste = fs::read_dir(root.join("LF05-Daten")).unwrap().filter(|e| {
+            e.as_ref().unwrap().file_name().to_string_lossy().ends_with("blockbuch-tmp")
+        });
+        assert_eq!(reste.count(), 0, "keine Temp-Dateien übrig");
         schreibe_atomar(&pfad, "neu", None).unwrap();
         assert_eq!(fs::read_to_string(&pfad).unwrap(), "neu");
     }
@@ -502,6 +540,17 @@ mod tests {
         let err = notiz_speichern(&root, "LF05-Daten", &n.datei, "# Joins\n\nMein Text\n", Some(neu)).unwrap_err();
         assert!(err.starts_with(KONFLIKT));
         assert!(notiz_lesen(&root, "LF05-Daten", &n.datei).unwrap().inhalt.contains("Von Claude"));
+
+        // Konfliktkopie neben dem Original, nichts überschrieben
+        let kopie = notiz_konfliktkopie(&root, "LF05-Daten", &n.datei, "Mein Text", "1042").unwrap();
+        assert_eq!(kopie, "2026-10-07-Joins-konflikt-1042.md");
+        let kopie2 = notiz_konfliktkopie(&root, "LF05-Daten", &n.datei, "Noch mehr", "1042").unwrap();
+        assert_eq!(kopie2, "2026-10-07-Joins-konflikt-1042-2.md");
+        assert!(notiz_konfliktkopie(&root, "LF05-Daten", &n.datei, "x", "10:42").is_err());
+
+        // Eigene Änderungszeit stimmt mit der Datei überein
+        let t = notiz_speichern(&root, "LF05-Daten", &kopie, "neu", None).unwrap();
+        assert_eq!(t, notiz_lesen(&root, "LF05-Daten", &kopie).unwrap().geaendert);
 
         // Gelöschte Datei wird beim Speichern nicht wieder angelegt
         fs::remove_file(root.join("LF05-Daten").join(&n.datei)).unwrap();

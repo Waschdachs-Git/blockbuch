@@ -13,6 +13,10 @@ export const api = {
   /** erwartet = Änderungszeit vom letzten Lesen/Speichern; null überschreibt bewusst */
   notizSpeichern: (ordner: string, datei: string, inhalt: string, erwartet: number | null) =>
     invoke<number>("notiz_speichern", { ordner, datei, inhalt, erwartet }),
+  notizKonfliktkopie: (ordner: string, datei: string, inhalt: string, uhrzeit: string) =>
+    invoke<string>("notiz_konfliktkopie", { ordner, datei, inhalt, uhrzeit }),
+  /** Beendet die App – erst aufrufen, wenn alles gesichert ist */
+  beenden: () => invoke<void>("beenden"),
   notizErstellen: (ordner: string, lernfeld: string | null, titel: string, datum: string) =>
     invoke<NotizInfo>("notiz_erstellen", { ordner, lernfeld, titel, datum }),
   notizUmbenennen: (ordner: string, datei: string, titel: string) =>

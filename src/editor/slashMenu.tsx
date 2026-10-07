@@ -1,6 +1,6 @@
 // "/"-Menü: Tippe "/" am Zeilenanfang (oder nach Leerzeichen) und wähle einen Block per Tastatur.
 import { Extension, type Editor, type Range } from "@tiptap/core";
-import Suggestion, { type SuggestionProps, type SuggestionKeyDownProps } from "@tiptap/suggestion";
+import Suggestion, { exitSuggestion, type SuggestionProps, type SuggestionKeyDownProps } from "@tiptap/suggestion";
 import { useEffect, useRef } from "react";
 
 export type SlashEintrag = {
@@ -93,7 +93,7 @@ export function slashErweiterung(onChange: (z: SlashZustand) => void) {
               props = p;
               setze(aus(p, 0));
             },
-            onKeyDown: ({ event }: SuggestionKeyDownProps) => {
+            onKeyDown: ({ event, view }: SuggestionKeyDownProps) => {
               if (!props || !zustand.offen) return false;
               const n = zustand.eintraege.length;
               if (event.key === "ArrowDown") {
@@ -109,6 +109,8 @@ export function slashErweiterung(onChange: (z: SlashZustand) => void) {
                 return true;
               }
               if (event.key === "Escape") {
+                // Menü wirklich beenden – sonst öffnet es beim nächsten Buchstaben wieder
+                exitSuggestion(view);
                 setze(SLASH_GESCHLOSSEN);
                 return true;
               }

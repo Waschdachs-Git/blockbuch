@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { LERNFELDER, ordnerAusNamen } from "./lernfelder";
 import { Sidebar } from "./components/Sidebar";
 import { NoteList } from "./components/NoteList";
@@ -31,6 +32,23 @@ function App() {
   const ordner = alleOrdner.find((o) => o.name === aktiverOrdner) ?? alleOrdner[0];
 
   const melde = useCallback((e: unknown) => setMeldung(fehlerText(e)), []);
+
+  // ⌘Q, Fenster schließen: Rust fragt erst an, wir sichern, dann wird beendet
+  useEffect(() => {
+    let aktiv = true;
+    let abmelden: (() => void) | undefined;
+    listen("beenden-angefragt", async () => {
+      try {
+        await editorRef.current?.speichernJetzt();
+      } finally {
+        await api.beenden();
+      }
+    }).then((f) => (aktiv ? (abmelden = f) : f()));
+    return () => {
+      aktiv = false;
+      abmelden?.();
+    };
+  }, []);
 
   // ~/Schule öffnen und Lernfeld-Ordner sicherstellen
   useEffect(() => {

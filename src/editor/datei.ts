@@ -18,14 +18,62 @@ export function zerlege(roh: string): NotizDatei {
   return { bom, nl, frontmatter, text: inhalt.slice(frontmatter.length) };
 }
 
+/** Zerlegt eine Zeile in [Text, Code, Text, Code, …]. Ein Code-Abschnitt beginnt mit n Backticks und
+ *  endet erst bei genau n Backticks; maskierte Backticks (\`) außerhalb von Code zählen nicht. */
+export function teileInlineCode(zeile: string): string[] {
+  const teile: string[] = [];
+  let text = "";
+  let i = 0;
+  while (i < zeile.length) {
+    if (zeile[i] === "\\" && zeile[i + 1] === "`") {
+      text += "\\`";
+      i += 2;
+      continue;
+    }
+    if (zeile[i] !== "`") {
+      text += zeile[i++];
+      continue;
+    }
+    let n = 0;
+    while (zeile[i + n] === "`") n++;
+    // passendes Ende: genau n Backticks
+    let j = i + n;
+    let ende = -1;
+    while (j < zeile.length) {
+      if (zeile[j] !== "`") {
+        j++;
+        continue;
+      }
+      let m = 0;
+      while (zeile[j + m] === "`") m++;
+      if (m === n) {
+        ende = j;
+        break;
+      }
+      j += m;
+    }
+    if (ende < 0) {
+      // kein Ende: die Backticks sind normaler Text
+      text += zeile.slice(i, i + n);
+      i += n;
+      continue;
+    }
+    teile.push(text, zeile.slice(i, ende + n));
+    text = "";
+    i = ende + n;
+  }
+  teile.push(text);
+  return teile;
+}
+
 /** Der Editor schreibt <, > und & als HTML-Codes (&lt; …). In Lernnotizen ("x > 5", "C# & Java")
  *  ist das schlecht lesbar – also normale Zeichen, und nur wo Markdown es braucht ein Backslash. */
-function entschaerfeZeile(zeile: string): string {
-  // Nur ein als Zeichen gemeintes ">" am Zeilenanfang (&gt;) braucht "\\>" – echte Zitate ("> ") nicht
-  zeile = zeile.replace(/^(\s*(?:>\s*)*)&gt;/, "$1\\>");
-  // Inline-Code (`…`) nicht anfassen: Teile mit ungeradem Index liegen zwischen Backticks
-  return zeile
-    .split(/(`+[^`]*`+)/)
+export function entschaerfeZeile(zeile: string): string {
+  // Nur ein als Zeichen gemeintes ">" am Zeilenanfang (&gt;) braucht "\>" – echte Zitate ("> ") nicht.
+  // Auch nach Listenmarkern ("- ", "1. ", "- [ ] ") wäre ">" sonst ein Zitat.
+  zeile = zeile.replace(/^(\s*(?:(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?|>\s*)*)&gt;/, "$1\\>");
+  // Inline-Code nicht anfassen: Teile mit ungeradem Index sind Code
+  return teileInlineCode(zeile)
     .map((teil, i) => {
       if (i % 2 === 1) return teil;
       return teil
@@ -44,14 +92,15 @@ export function aufraeumen(text: string): string {
   const aus: string[] = [];
   let zaun: string | null = null;
   for (const zeile of text.split("\n")) {
-    const z = zeile.trimStart();
-    const f = z.startsWith("```") ? "```" : z.startsWith("~~~") ? "~~~" : null;
     if (zaun) {
-      if (f === zaun) zaun = null;
+      // Schließt nur ein Zaun aus demselben Zeichen, mindestens so lang, ohne weiteren Text
+      const zu = /^\s*(`{3,}|~{3,})\s*$/.exec(zeile);
+      if (zu && zu[1][0] === zaun[0] && zu[1].length >= zaun.length) zaun = null;
       aus.push(zeile);
       continue;
     }
-    if (f) zaun = f;
+    const auf = /^\s*(`{3,}|~{3,})/.exec(zeile);
+    if (auf) zaun = auf[1];
     const leer = zeile.trim() === "" || zeile.trim() === "&nbsp;";
     if (leer && (aus.length === 0 || aus[aus.length - 1] === "")) continue;
     aus.push(leer ? "" : entschaerfeZeile(zeile));
