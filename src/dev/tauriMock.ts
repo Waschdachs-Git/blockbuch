@@ -5,8 +5,17 @@ import { falten } from "../editor/falten";
 
 type Fs = Record<string, Record<string, string>>;
 
+// Startdaten wie beim Nutzer: eigene Lernfeld-Ordner LF1–LF5 und Fächer
 const fs: Fs = {
-  "LF05-Daten-verwalten": {
+  LF1: {},
+  LF2: {},
+  LF3: {},
+  LF4: {},
+  Deutsch: {},
+  Gemeinschaftskunde: {},
+  "Mathe-IT": {},
+  Wirtschaftskunde: {},
+  LF5: {
     "2026-10-06-SQL-Joins.md": "---\nlernfeld: LF05\ndatum: 2026-10-06\ntags: []\n---\n\n# SQL-Joins\n\n- INNER JOIN\n",
   },
 };

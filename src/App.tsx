@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { LERNFELDER, ordnerAusNamen } from "./lernfelder";
+import { ordnerAusNamen } from "./lernfelder";
 import { Sidebar } from "./components/Sidebar";
 import { NoteList } from "./components/NoteList";
 import { EditorPane, type EditorHandle } from "./components/EditorPane";
@@ -12,7 +12,7 @@ import { api, fehlerText, heute, type Aenderung, type NotizInfo, type Sicherungs
 
 function App() {
   const [ordnerNamen, setOrdnerNamen] = useState<string[] | null>(null);
-  const [aktiverOrdner, setAktiverOrdner] = useStoredState("blockbuch.ordner", LERNFELDER[0].ordner);
+  const [aktiverOrdner, setAktiverOrdner] = useStoredState("blockbuch.ordner", "");
   const [sidebarOffen, setSidebarOffen] = useStoredState("blockbuch.sidebarOffen", true);
   const [notizen, setNotizen] = useState<NotizInfo[]>([]);
   const [aktiveDatei, setAktiveDatei] = useState<string | null>(null);
@@ -138,7 +138,7 @@ function App() {
   // ~/Schule öffnen und Lernfeld-Ordner sicherstellen
   useEffect(() => {
     api
-      .schuleOeffnen(LERNFELDER.map((lf) => lf.ordner))
+      .schuleOeffnen([]) // keine Ordner vorgeben – der Nutzer legt seine Lernfelder/Fächer selbst an
       .then((info) => setOrdnerNamen(info.ordner))
       .catch(melde);
   }, [melde]);

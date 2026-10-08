@@ -99,6 +99,7 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
         </h2>
         <ul className="sidebar__liste" aria-labelledby="sidebar-lernfelder">
           {lernfelder.map(eintrag)}
+          {lernfelder.length === 0 && <li className="sidebar__hinweis">Ordner wie „LF1“, „LF2“ … erscheinen hier – mit + anlegen</li>}
         </ul>
 
         <div className="sidebar__abschnitt-zeile">
@@ -123,7 +124,7 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
               <input
                 className="inline-eingabe"
                 autoFocus
-                placeholder="z. B. Deutsch"
+                placeholder="z. B. Deutsch oder LF6"
                 aria-label="Name des neuen Ordners"
                 value={neuerOrdner}
                 onChange={(e) => setNeuerOrdner(e.target.value)}
@@ -136,7 +137,7 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
             </li>
           )}
           {faecher.length === 0 && neuerOrdner === null && (
-            <li className="sidebar__hinweis">Deutsch, Englisch, Wirtschaft … mit + anlegen</li>
+            <li className="sidebar__hinweis">Deutsch, Englisch, Wirtschaft … mit + anlegen (LF3 usw. landen oben)</li>
           )}
         </ul>
       </div>

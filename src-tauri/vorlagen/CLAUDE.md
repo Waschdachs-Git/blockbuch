@@ -16,8 +16,10 @@ aktualisieren (Datum, was sitzt, was geübt werden muss). Den Rest der Datei nur
 
 ## Ordner
 
-- `LF01-…` bis `LF12-…`: ein Ordner pro Lernfeld (KMK-Rahmenlehrplan FIAE 2020; LF10–12 = 10a–12a)
-- weitere Ordner: allgemeine Fächer (z. B. Deutsch, Englisch, Wirtschaft)
+- Lernfeld-Ordner: vom Nutzer angelegt, Name beginnt mit `LF` + Nummer (z. B. `LF1`, `LF2`, auch
+  `LF5-Datenbanken`). Es gibt nur die Lernfelder, die der Nutzer angelegt hat – keine weiteren anlegen.
+  Titel/Inhalte laut KMK-Rahmenlehrplan FIAE 2020 (LF10–12 = 10a–12a).
+- weitere Ordner: allgemeine Fächer (z. B. Deutsch, Gemeinschaftskunde, Wirtschaftskunde)
 - `Gerettet/`: Konfliktkopien, die die App angelegt hat – nicht anfassen
 - `assets/` (in einem Ordner): Bilder/Dateien zu Notizen
 - `.claude/`: Befehle für dich – keine Notizen
@@ -145,8 +147,8 @@ tags: []
 Text …
 ```
 
-- Frontmatter (zwischen `---`) nie löschen. `lernfeld` steht nur in Lernfeld-Ordnern (`LF05` aus dem
-  Ordnernamen `LF05-…`), bei Fächern weglassen. `datum` im Format `JJJJ-MM-TT` ohne Anführungszeichen.
+- Frontmatter (zwischen `---`) nie löschen. `lernfeld` steht nur in Lernfeld-Ordnern, immer zweistellig
+  (`LF05` für den Ordner `LF5`), bei Fächern weglassen. `datum` im Format `JJJJ-MM-TT` ohne Anführungszeichen.
 - Die erste `# Überschrift` ist der Titel, den die App anzeigt.
 - **Neue Notizen von dir:** Dateiname mit Datum von heute, Titel ohne Umlaute (ä→ae, ö→oe, ü→ue,
   ß→ss), Wörter mit Bindestrichen, keine Sonderzeichen (z. B. `2026-10-07-Lernskript-Normalisierung.md`).

@@ -1,6 +1,6 @@
 // Lernfelder laut KMK-Rahmenlehrplan Fachinformatiker/in Anwendungsentwicklung (2020).
-// `ordner` ist der Ordnername in ~/Schule – wird beim Start automatisch angelegt.
-// `id` und `ordner` NICHT mehr ändern, sobald Notizen existieren – Frontmatter und Pfade hängen daran.
+// Nur noch Nachschlagewerk für Titel: Die App legt KEINE Lernfeld-Ordner an – sie erkennt die Ordner des
+// Nutzers (LF1, LF2 … oder LF5-Datenbanken) und zeigt dazu den Titel aus dem Rahmenlehrplan.
 // `rlp` ist die offizielle Nummer im Rahmenlehrplan (Fachrichtungs-Lernfelder heißen dort 10a–12a).
 
 export type Lernfeld = {
@@ -35,23 +35,46 @@ export type Ordner = {
   lernfeld?: Lernfeld;
 };
 
-/** Ordner von der Platte mit Lernfeld-Infos anreichern; Lernfelder zuerst, dann eigene Fächer */
+/** Lernfeld-Nummer aus dem Ordnernamen: "LF5", "LF05", "LF 5", "LF5-Datenbanken" → 5 */
+export function lernfeldNummer(name: string): number | null {
+  const m = /^LF\s*0*(\d{1,2})(?=$|[\s_-])/i.exec(name.normalize("NFC"));
+  const n = m ? Number(m[1]) : NaN;
+  return n >= 1 && n <= 20 ? n : null;
+}
+
+/** Ordner von der Platte einteilen: Ordner, die mit "LF" + Nummer beginnen, sind Lernfelder
+ *  (sortiert nach Nummer), alle anderen Fächer. Die App legt selbst keine Lernfeld-Ordner an –
+ *  der Nutzer bestimmt, welche es gibt (z. B. nur LF1–LF5). */
 export function ordnerAusNamen(namen: string[]): { lernfelder: Ordner[]; faecher: Ordner[] } {
-  const lernfelder: Ordner[] = [];
+  const lernfelder: (Ordner & { nr: number })[] = [];
   const faecher: Ordner[] = [];
-  const vergleich = (s: string) => s.normalize("NFC").toLowerCase();
-  const vergeben = new Set<string>();
-  for (const lf of LERNFELDER) {
-    const name = namen.find((n) => vergleich(n) === vergleich(lf.ordner));
-    if (name) {
-      vergeben.add(name);
-      lernfelder.push({ name, anzeige: lf.kurz, nummer: lf.id.slice(2), titel: lf.titel, lernfeld: lf });
-    }
-  }
   for (const name of namen) {
-    const anzeige = name.normalize("NFC");
-    if (!vergeben.has(name)) faecher.push({ name, anzeige, titel: anzeige });
+    const anzeigeName = name.normalize("NFC");
+    const nr = lernfeldNummer(name);
+    if (nr === null) {
+      faecher.push({ name, anzeige: anzeigeName, titel: anzeigeName });
+      continue;
+    }
+    const kmk = LERNFELDER[nr - 1];
+    // Eigener Name nach der Nummer ("LF5-Datenbanken") hat Vorrang vor dem Rahmenlehrplan-Titel
+    const rest = anzeigeName.replace(/^LF\s*0*\d{1,2}[\s_-]*/i, "").replace(/[-_]+/g, " ").trim();
+    const nummer = String(nr).padStart(2, "0");
+    lernfelder.push({
+      nr,
+      name,
+      nummer,
+      anzeige: rest || kmk?.kurz || `Lernfeld ${nr}`,
+      titel: rest || kmk?.titel || `Lernfeld ${nr}`,
+      lernfeld: {
+        id: `LF${nummer}`,
+        rlp: kmk?.rlp ?? String(nr),
+        kurz: rest || kmk?.kurz || `Lernfeld ${nr}`,
+        titel: rest || kmk?.titel || `Lernfeld ${nr}`,
+        ordner: name,
+      },
+    });
   }
+  lernfelder.sort((a, b) => a.nr - b.nr || a.name.localeCompare(b.name, "de"));
   faecher.sort((a, b) => a.anzeige.localeCompare(b.anzeige, "de"));
-  return { lernfelder, faecher };
+  return { lernfelder: lernfelder.map(({ nr: _nr, ...o }) => o), faecher };
 }

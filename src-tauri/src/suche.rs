@@ -167,10 +167,22 @@ fn tags(frontmatter: &str) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// Lernfeld-Filter aus der Anfrage: "lf5", "LF05" → "lf05"
-fn lernfeld_filter(wort: &str) -> Option<String> {
+/// Lernfeld-Filter aus der Anfrage: "lf5", "LF05" → 5
+fn lernfeld_filter(wort: &str) -> Option<u32> {
     let n: u32 = wort.strip_prefix("lf")?.parse().ok()?;
-    (1..=12).contains(&n).then(|| format!("lf{n:02}"))
+    (1..=20).contains(&n).then_some(n)
+}
+
+/// Lernfeld-Nummer eines Ordners: "LF5", "LF05", "LF 5", "LF5-Datenbanken" → 5
+pub fn lernfeld_nummer(ordner: &str) -> Option<u32> {
+    let rest = falten(ordner);
+    let rest = rest.strip_prefix("lf")?.trim_start();
+    let ziffern: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    let danach = rest[ziffern.len()..].chars().next();
+    if ziffern.is_empty() || danach.is_some_and(|c| !matches!(c, ' ' | '-' | '_')) {
+        return None;
+    }
+    ziffern.parse().ok()
 }
 
 /// Anfrage-Syntax: normale Wörter (alle müssen vorkommen), "lf5" = nur Lernfeld 5,
@@ -178,7 +190,7 @@ fn lernfeld_filter(wort: &str) -> Option<String> {
 /// Marker wie ❓ und 🙋 gehen als ganz normale Suchwörter.
 pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
     let mut woerter: Vec<String> = Vec::new();
-    let mut lernfeld: Option<String> = None;
+    let mut lernfeld: Option<u32> = None;
     let mut tag_filter: Vec<String> = Vec::new();
     for w in falten(anfrage).split_whitespace() {
         if let Some(lf) = lernfeld_filter(w) {
@@ -195,8 +207,8 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
         if ordner == "Gerettet" {
             continue; // Konfliktkopien nicht in der Suche
         }
-        if let Some(lf) = &lernfeld {
-            if !falten(&ordner).starts_with(lf.as_str()) {
+        if let Some(lf) = lernfeld {
+            if lernfeld_nummer(&ordner) != Some(lf) {
                 continue;
             }
         }
@@ -388,6 +400,16 @@ mod tests {
         let dauer = start.elapsed();
         println!("1008 Notizen durchsucht in {dauer:?}, {} Treffer", t.len());
         assert!(dauer.as_millis() < 1000);
+    }
+
+    #[test]
+    fn lernfeld_nummern_aus_ordnernamen() {
+        assert_eq!(lernfeld_nummer("LF5"), Some(5));
+        assert_eq!(lernfeld_nummer("LF05-Daten-verwalten"), Some(5));
+        assert_eq!(lernfeld_nummer("lf 12"), Some(12));
+        assert_eq!(lernfeld_nummer("LF1_Unternehmen"), Some(1));
+        assert_eq!(lernfeld_nummer("LF5x"), None);
+        assert_eq!(lernfeld_nummer("Deutsch"), None);
     }
 
     #[test]

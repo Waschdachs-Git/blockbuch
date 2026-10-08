@@ -63,7 +63,7 @@ SELECT * FROM kunde k INNER JOIN auftrag a ON k.id = a.kunde_id;
 |---|---|---|
 | 0 | Setup: Node.js + Rust installieren, Tauri-Projekt anlegen | `npm run tauri dev` öffnet ein Fenster |
 | 1 | Grundlayout: Seitenleiste + Editorbereich, Hell/Dunkel | sieht aus wie eine Notizen-App |
-| 2 | Seitenleiste: LF01–LF12 anlegen, Notizen erstellen/umbenennen/löschen (Papierkorb) | Notiz in LF05 anlegbar |
+| 2 | Seitenleiste: Ordner des Nutzers (LF1, LF2 … oben als Lernfelder, sonst Fächer), Notizen erstellen/umbenennen/löschen (Papierkorb) | Notiz in LF5 anlegbar |
 | 3 | Editor: TipTap, Überschriften/Listen/Tabellen, `/`-Menü, Markdown laden/speichern, Autosave | Schreiben, schließen, öffnen – alles da |
 | 4 | Live-Sync: Dateiüberwachung, Neu-Laden, keine Konflikte/Überschreibungen | Claude ändert offene Notiz → App zeigt es sofort |
 | 5 | Code-Block mit Syntax-Highlighting | `/code` funktioniert |
