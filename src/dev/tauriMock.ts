@@ -124,6 +124,22 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
     case "in_vorschau_oeffnen":
       console.info("[Simulation] würde in Vorschau öffnen:", a.pfad);
       return null;
+    case "suchen": {
+      // einfache Nachbildung der Rust-Suche (ohne Umlaut-Faltung)
+      const woerter = String(a.anfrage).toLowerCase().split(/\s+/).filter(Boolean);
+      const treffer = [];
+      for (const [o, dateien] of Object.entries(fs)) {
+        for (const [d, inhalt] of Object.entries(dateien)) {
+          if (!d.endsWith(".md") || d.includes("/")) continue;
+          const t = inhalt.toLowerCase();
+          if (!woerter.every((w) => t.includes(w))) continue;
+          const zeile = inhalt.split("\n").find((z) => !z.startsWith("# ") && woerter.some((w) => z.toLowerCase().includes(w))) ?? "";
+          const i = info(d, inhalt);
+          treffer.push({ ordner: o, datei: d, titel: i.titel, datum: i.datum, ausschnitt: zeile.replace(/^[#>\-\s]+/, ""), art: "notiz", pdf: null });
+        }
+      }
+      return treffer.slice(0, 50);
+    }
     case "notiz_loeschen":
       delete fs[a.ordner][a.datei];
       return null;

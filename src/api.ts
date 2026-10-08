@@ -4,6 +4,15 @@ import { invoke } from "@tauri-apps/api/core";
 export type SchuleInfo = { pfad: string; ordner: string[] };
 export type NotizInfo = { datei: string; titel: string; datum: string; geaendert: number };
 export type NotizInhalt = { inhalt: string; geaendert: number };
+export type Treffer = {
+  ordner: string;
+  datei: string | null;
+  titel: string;
+  datum: string;
+  ausschnitt: string;
+  art: "notiz" | "pdf";
+  pdf: string | null;
+};
 /** Vom Dateibeobachter gemeldet (Ereignis "schule-geaendert") */
 export type Aenderung = { ordner: string | null; datei: string | null };
 
@@ -11,6 +20,8 @@ export const api = {
   schuleOeffnen: (standardOrdner: string[]) => invoke<SchuleInfo>("schule_oeffnen", { standardOrdner }),
   ordnerErstellen: (name: string) => invoke<string[]>("ordner_erstellen", { name }),
   ordnerAuflisten: () => invoke<string[]>("ordner_auflisten"),
+  /** Volltextsuche; leere Anfrage = zuletzt bearbeitete Notizen */
+  suchen: (anfrage: string) => invoke<Treffer[]>("suchen", { anfrage }),
   notizenAuflisten: (ordner: string) => invoke<NotizInfo[]>("notizen_auflisten", { ordner }),
   notizLesen: (ordner: string, datei: string) => invoke<NotizInhalt>("notiz_lesen", { ordner, datei }),
   /** erwartet = Änderungszeit vom letzten Lesen/Speichern; null überschreibt bewusst */

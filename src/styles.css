@@ -1126,3 +1126,110 @@ button {
   color: var(--bg);
   padding: 8px 14px;
 }
+
+/* ---------- Schritt 8: Suche (⌘K) ---------- */
+
+.suche-hintergrund {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.suche {
+  width: min(640px, 100%);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--linie);
+  background: var(--bg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.suche__eingabe {
+  flex: none;
+  padding: 16px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--linie);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  outline: none;
+}
+
+.suche__kopf,
+.suche__fuss {
+  flex: none;
+  padding: 6px 18px;
+  font-size: 11px;
+  color: var(--text-leise);
+}
+
+.suche__fuss {
+  border-top: 1px solid var(--linie);
+}
+
+.suche__liste {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+}
+
+.suche__treffer {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.suche__treffer.ist-aktiv {
+  background: var(--bg-aktiv);
+}
+
+.suche__zeile {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.suche__titel {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suche__ort {
+  margin-left: auto;
+  flex: none;
+  font-size: 11px;
+  color: var(--text-leise);
+}
+
+.suche__ausschnitt {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-leise);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suche mark {
+  background: color-mix(in srgb, var(--akzent) 25%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.suche__leer {
+  margin: 12px 18px;
+  color: var(--text-leise);
+}

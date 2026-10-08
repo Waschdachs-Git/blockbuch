@@ -4,9 +4,10 @@ import { LERNFELDER, ordnerAusNamen } from "./lernfelder";
 import { Sidebar } from "./components/Sidebar";
 import { NoteList } from "./components/NoteList";
 import { EditorPane, type EditorHandle } from "./components/EditorPane";
+import { Suche } from "./components/Suche";
 import { useStoredState } from "./useStoredState";
 import { ASSETS_GEAENDERT } from "./editor/grafikBlock";
-import { api, fehlerText, heute, type Aenderung, type NotizInfo } from "./api";
+import { api, fehlerText, heute, type Aenderung, type NotizInfo, type Treffer } from "./api";
 
 function App() {
   const [ordnerNamen, setOrdnerNamen] = useState<string[] | null>(null);
@@ -18,6 +19,9 @@ function App() {
   const [notizVersion, setNotizVersion] = useState(0);
   const [meldung, setMeldung] = useState<string | null>(null);
   const [statusText, setStatusText] = useState<string | null>(null);
+  const [sucheOffen, setSucheOffen] = useState(false);
+  // Notiz, die nach einem Ordnerwechsel (aus der Suche) ausgewählt werden soll
+  const auswahlNachOrdnerwechsel = useRef<string | null>(null);
 
   const sidebarRef = useRef<HTMLElement>(null);
   const listeRef = useRef<HTMLElement>(null);
@@ -145,7 +149,9 @@ function App() {
     if (!ordner) return;
     aktuellerOrdnerRef.current = ordner.name;
     setUmbenennenDatei(null);
-    ladeNotizen(ordner.name, null).catch(melde);
+    const wunsch = auswahlNachOrdnerwechsel.current;
+    auswahlNachOrdnerwechsel.current = null;
+    ladeNotizen(ordner.name, wunsch).catch(melde);
   }, [ordner?.name, ladeNotizen, melde]);
 
   const legtNotizAn = useRef(false);
@@ -216,6 +222,26 @@ function App() {
     }
   }
 
+  /** Treffer aus der Suche öffnen: Ordner + Notiz wählen, dann zur Fundstelle springen */
+  function trefferOeffnen(t: Treffer, woerter: string[]) {
+    setSucheOffen(false);
+    if (!t.datei) {
+      // PDF, das in keiner Notiz eingebunden ist → in Vorschau öffnen
+      if (t.pdf) api.inVorschauOeffnen(t.ordner, t.pdf).catch(melde);
+      return;
+    }
+    const gleicheNotiz = t.ordner === ordner?.name && t.datei === aktiveDatei;
+    if (t.ordner !== ordner?.name) {
+      auswahlNachOrdnerwechsel.current = t.datei;
+      setAktiverOrdner(t.ordner);
+    } else if (!gleicheNotiz) {
+      setAktiveDatei(t.datei);
+    }
+    // Bei PDF-Treffern zum PDF-Block springen, sonst zum Suchbegriff
+    const ziel = t.art === "pdf" && t.pdf ? [t.pdf.replace(/^assets\//, "")] : woerter;
+    editorRef.current?.springeZu(ziel, !gleicheNotiz);
+  }
+
   function fokusListe() {
     requestAnimationFrame(() => {
       const ziel =
@@ -238,6 +264,7 @@ function App() {
   menueRef.current = (id) => {
     if (id === "neue-notiz") neueNotiz();
     if (id === "ordner-leiste") toggleSidebar();
+    if (id === "suchen") setSucheOffen(true);
   };
   useEffect(() => {
     let aktiv = true;
@@ -258,6 +285,11 @@ function App() {
       if (e.altKey && !e.shiftKey && e.code === "KeyS") {
         e.preventDefault();
         if (!e.repeat) toggleSidebar();
+      }
+      // ⌘K: Suche
+      if (!e.altKey && !e.shiftKey && e.code === "KeyK") {
+        e.preventDefault();
+        setSucheOffen(true);
       }
       // ⌘N: neue Notiz im aktuellen Ordner
       if (!e.altKey && !e.shiftKey && e.code === "KeyN") {
@@ -338,6 +370,13 @@ function App() {
         onZurueck={fokusListe}
         onFehler={melde}
       />
+      {sucheOffen && (
+        <Suche
+          ordnerName={(name) => alleOrdner.find((o) => o.name === name)?.anzeige ?? name}
+          onOeffnen={trefferOeffnen}
+          onSchliessen={() => setSucheOffen(false)}
+        />
+      )}
       {statusText && !meldung && (
         <div className="meldung meldung--status" role="status">
           <span>{statusText}</span>

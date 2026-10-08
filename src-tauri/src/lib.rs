@@ -4,6 +4,7 @@
 mod beobachter;
 mod grafik;
 mod notizen;
+mod suche;
 
 use notizen::{Ergebnis, NotizInfo, NotizInhalt};
 use serde::Serialize;
@@ -140,6 +141,12 @@ async fn in_vorschau_oeffnen(app: tauri::AppHandle, ordner: String, pfad: String
         .map_err(|e| e.to_string())
 }
 
+/// Volltextsuche (leere Anfrage: zuletzt bearbeitete Notizen)
+#[tauri::command]
+async fn suchen(app: tauri::AppHandle, anfrage: String) -> Ergebnis<Vec<suche::Treffer>> {
+    Ok(suche::suchen(&schule_pfad(&app)?, &anfrage, 50))
+}
+
 /// Von der Oberfläche aufgerufen, nachdem alles gesichert ist
 #[tauri::command]
 fn beenden(app: tauri::AppHandle) {
@@ -195,6 +202,7 @@ pub fn run() {
             asset_speichern,
             asset_lesen,
             in_vorschau_oeffnen,
+            suchen,
             beenden,
             notiz_erstellen,
             notiz_umbenennen,
@@ -243,6 +251,7 @@ pub fn run() {
             // Ablage/Darstellung als echte Menüpunkte: Kürzel wirken auch, wenn eine Grafik den Fokus hat
             let ablage = SubmenuBuilder::new(h, "Ablage")
                 .item(&MenuItemBuilder::with_id("neue-notiz", "Neue Notiz").accelerator("CmdOrCtrl+N").build(h)?)
+                .item(&MenuItemBuilder::with_id("suchen", "Suchen …").accelerator("CmdOrCtrl+K").build(h)?)
                 .build()?;
             let darstellung = SubmenuBuilder::new(h, "Darstellung")
                 .item(

@@ -16,6 +16,9 @@ export type EditorHandle = {
   speichernJetzt: () => Promise<void>;
   /** Die offene Notiz wurde auf der Platte geändert (z. B. von Claude) */
   externGeaendert: () => Promise<void>;
+  /** Nach dem Öffnen aus der Suche: zur ersten Fundstelle springen und sie markieren.
+   *  `nachLaden`: erst nachdem die (gerade gewählte) Notiz geladen ist */
+  springeZu: (woerter: string[], nachLaden: boolean) => void;
 };
 
 type Props = {
@@ -56,6 +59,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   const geaendert = useRef(false); // ungespeicherte Änderungen im Editor
   const timer = useRef<number | undefined>(undefined);
   const fokusNachLaden = useRef(false);
+  const sprungNachLaden = useRef<string[] | null>(null);
   const laufend = useRef<Promise<void>>(Promise.resolve());
   const ladeNr = useRef(0);
   const slashRef = useRef(slash);
@@ -213,7 +217,12 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     setKonflikt(null);
     setStatus("gespeichert");
     setGeladen(true);
-    if (fokusNachLaden.current) {
+    if (sprungNachLaden.current) {
+      const w = sprungNachLaden.current;
+      sprungNachLaden.current = null;
+      fokusNachLaden.current = false;
+      requestAnimationFrame(() => springe(w));
+    } else if (fokusNachLaden.current) {
       fokusNachLaden.current = false;
       requestAnimationFrame(() => editor.commands.focus("end"));
     }
@@ -301,6 +310,27 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   // Beim Schließen der Ansicht nichts verlieren
   useEffect(() => () => void sichernVorWeggang(), [editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /** Erste Stelle suchen, an der eines der Wörter vorkommt (ohne Groß/klein), markieren und hinscrollen */
+  function springe(woerter: string[]) {
+    if (!editor) return;
+    const klein = woerter.map((w) => w.toLowerCase()).filter(Boolean);
+    let ziel: { from: number; to: number } | null = null;
+    editor.state.doc.descendants((n, pos) => {
+      if (ziel || !n.isText || !n.text) return !ziel;
+      const t = n.text.toLowerCase();
+      for (const w of klein) {
+        const i = t.indexOf(w);
+        if (i >= 0) {
+          ziel = { from: pos + i, to: pos + i + w.length };
+          break;
+        }
+      }
+      return false;
+    });
+    if (ziel) editor.chain().focus().setTextSelection(ziel).scrollIntoView().run();
+    else editor.commands.focus("start");
+  }
+
   useImperativeHandle(ref, () => ({
     fokus: () => {
       if (geoeffnet.current) editor?.commands.focus("end");
@@ -308,6 +338,10 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     },
     speichernJetzt: () => sichernVorWeggang(),
     externGeaendert,
+    springeZu: (woerter, nachLaden) => {
+      if (!nachLaden && geoeffnet.current) springe(woerter);
+      else sprungNachLaden.current = woerter;
+    },
   }));
 
   // Offene Schnellmarker (❓ unklar, 🙋 Lehrkraft fragen) für die Anzeige oben
