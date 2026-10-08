@@ -30,6 +30,7 @@ type Props = {
   onGespeichert: () => void;
   onZurueck: () => void;
   onFehler: (e: unknown) => void;
+  onVersionen: () => void;
 };
 
 type Geoeffnet = {
@@ -41,7 +42,7 @@ type Geoeffnet = {
 };
 type Status = "gespeichert" | "ungespeichert" | "speichert" | "fehler";
 
-export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurueck, onFehler }: Props) {
+export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurueck, onFehler, onVersionen }: Props) {
   const [slash, setSlash] = useState<SlashZustand>(SLASH_GESCHLOSSEN);
   const [status, setStatus] = useState<Status>("gespeichert");
   const [konflikt, setKonflikt] = useState<string | null>(null);
@@ -374,6 +375,11 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
             {marker.unklar > 0 && marker.fragen > 0 && " · "}
             {marker.fragen > 0 && `${MARKER_FRAGEN} ${marker.fragen}`}
           </span>
+        )}
+        {datei && geladen && (
+          <button className="icon-knopf versionen-knopf" onClick={onVersionen} title="Versionen dieser Notiz (⇧⌘H)" aria-label="Versionen dieser Notiz">
+            🕘
+          </button>
         )}
         {datei && geladen && (
           <span className={`speicherstatus speicherstatus--${vonAussen ? "aussen" : status}`} role="status">

@@ -33,6 +33,11 @@ const frei = (o: string, basis: string) => {
 
 const ordner = () => Object.keys(fs).sort();
 const zeiten: Record<string, number> = {};
+const versionen: Record<string, { zeit: string; inhalt: string }[]> = {};
+function merkeVersion(o: string, d: string, inhalt: string) {
+  const liste = (versionen[`${o}/${d}`] ??= []);
+  if (liste[liste.length - 1]?.inhalt !== inhalt) liste.push({ zeit: new Date().toISOString(), inhalt });
+}
 
 // Ereignisse (listen/emit) nachbilden
 const rueckrufe = new Map<number, (x: unknown) => void>();
@@ -142,6 +147,25 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
       }
       return treffer.slice(0, 50);
     }
+    // Versionen: einfache Nachbildung – jede Speicherung einer Notiz ist eine Version
+    case "versionen":
+      return (versionen[`${a.ordner}/${a.datei}`] ?? [])
+        .map((v, i) => ({ hash: `abc${String(i).padStart(4, "0")}`, zeit: v.zeit, nachricht: i === 0 ? "Beim Start" : "Automatische Sicherung", pfad: `${a.ordner}/${a.datei}` }))
+        .reverse();
+    case "version_lesen": {
+      const i = Number(String(a.hash).slice(3));
+      return versionen[a.pfad]?.[i]?.inhalt ?? "";
+    }
+    case "version_wiederherstellen": {
+      const i = Number(String(a.hash).slice(3));
+      const inhalt = versionen[a.pfad]?.[i]?.inhalt ?? "";
+      (window as unknown as { __aendereVonAussen: (o: string, d: string, i: string) => void }).__aendereVonAussen(a.ordner, a.datei, inhalt);
+      return null;
+    }
+    case "jetzt_sichern":
+      for (const [o, d] of Object.entries(fs)) for (const [n, inhalt] of Object.entries(d)) if (n.endsWith(".md")) merkeVersion(o, n, inhalt);
+      setTimeout(() => emit("sicherung", { zeit: new Date().toISOString(), fehler: null }), 50);
+      return "abc1234";
     case "notiz_loeschen":
       delete fs[a.ordner][a.datei];
       return null;

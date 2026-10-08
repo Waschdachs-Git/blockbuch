@@ -6,7 +6,6 @@ import Image from "@tiptap/extension-image";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { api, fehlerText, heute } from "../api";
 import { grafikAdresse, grafikOrdner, notizSitzung } from "./grafikBlock";
-import { pdfText } from "./pdfBlock";
 
 const BILD = /^image\/(png|jpe?g|gif|webp|svg\+xml|heic)$/;
 const ERLAUBT = /\.(png|jpe?g|gif|webp|svg|heic|pdf)$/i;
@@ -89,13 +88,7 @@ async function einfuegenEine(
     const pos = Math.min(ziel(), editor.state.doc.content.size);
     editor.chain().insertContentAt(pos, knoten).run();
     setzeZiel(editor.state.selection.to);
-    // PDF-Text daneben speichern (für Suche und Claude) – Fehler hier sind nicht schlimm
-    if (istPdf) {
-      const txtName = pfad.replace(/^assets\//, "").replace(/\.pdf$/i, ".txt");
-      pdfText(daten)
-        .then((text) => api.assetSpeichern(ordner, txtName, new TextEncoder().encode(text)))
-        .catch(() => {});
-    }
+    // Den PDF-Text (.txt daneben) legt die App selbst an (Rust, PDFKit) – siehe pdftext.rs
   } catch (e) {
     meldeFehler(e);
   }

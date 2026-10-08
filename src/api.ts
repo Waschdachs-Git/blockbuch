@@ -13,6 +13,9 @@ export type Treffer = {
   art: "notiz" | "pdf";
   pdf: string | null;
 };
+export type Version = { hash: string; zeit: string; nachricht: string; pfad: string };
+/** Ereignis "sicherung": Zeitpunkt der letzten Sicherung oder Fehler */
+export type SicherungsStand = { zeit: string | null; fehler: string | null };
 /** Vom Dateibeobachter gemeldet (Ereignis "schule-geaendert") */
 export type Aenderung = { ordner: string | null; datei: string | null };
 
@@ -20,6 +23,11 @@ export const api = {
   schuleOeffnen: (standardOrdner: string[]) => invoke<SchuleInfo>("schule_oeffnen", { standardOrdner }),
   ordnerErstellen: (name: string) => invoke<string[]>("ordner_erstellen", { name }),
   ordnerAuflisten: () => invoke<string[]>("ordner_auflisten"),
+  versionen: (ordner: string, datei: string) => invoke<Version[]>("versionen", { ordner, datei }),
+  versionLesen: (hash: string, pfad: string) => invoke<string>("version_lesen", { hash, pfad }),
+  versionWiederherstellen: (ordner: string, datei: string, hash: string, pfad: string) =>
+    invoke<void>("version_wiederherstellen", { ordner, datei, hash, pfad }),
+  jetztSichern: () => invoke<string | null>("jetzt_sichern"),
   /** Volltextsuche; leere Anfrage = zuletzt bearbeitete Notizen */
   suchen: (anfrage: string) => invoke<Treffer[]>("suchen", { anfrage }),
   notizenAuflisten: (ordner: string) => invoke<NotizInfo[]>("notizen_auflisten", { ordner }),

@@ -1233,3 +1233,139 @@ button {
   margin: 12px 18px;
   color: var(--text-leise);
 }
+
+/* ---------- Schritt 9: Sicherung und Versionen ---------- */
+
+.sidebar__sicherung {
+  flex: none;
+  padding: 8px 18px 12px;
+  font-size: 11px;
+  color: var(--text-leise);
+  border-top: 1px solid var(--linie);
+}
+
+.sidebar__sicherung.ist-fehler {
+  color: #c4314b;
+}
+
+.versionen-knopf {
+  margin-right: 4px;
+  font-size: 13px;
+}
+
+.versionen {
+  width: min(960px, 100%);
+  height: min(640px, 76vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--linie);
+  background: var(--bg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  outline: none;
+}
+
+.versionen__kopf {
+  flex: none;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--linie);
+}
+
+.versionen__inhalt {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+}
+
+.versionen__liste {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  overflow-y: auto;
+  border-right: 1px solid var(--linie);
+}
+
+.versionen__eintrag {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.versionen__eintrag.ist-aktiv {
+  background: var(--bg-aktiv);
+}
+
+.versionen__zeit {
+  font-weight: 600;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.versionen__marke {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--akzent);
+  color: #fff;
+}
+
+.versionen__nachricht {
+  font-size: 11px;
+  color: var(--text-leise);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.versionen__vorschau {
+  margin: 0;
+  padding: 16px 20px;
+  overflow: auto;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.versionen__fuss {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--linie);
+  font-size: 12px;
+}
+
+.versionen__fuss > span {
+  flex: 1;
+}
+
+.versionen__hinweis {
+  color: var(--text-leise);
+}
+
+.versionen__fuss button {
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--linie);
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.versionen__fuss button.primaer {
+  background: var(--akzent);
+  border-color: var(--akzent);
+  color: #fff;
+}
+
+.versionen__fuss button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

@@ -5,9 +5,10 @@ import { Sidebar } from "./components/Sidebar";
 import { NoteList } from "./components/NoteList";
 import { EditorPane, type EditorHandle } from "./components/EditorPane";
 import { Suche } from "./components/Suche";
+import { Versionen, zeitAnzeigen } from "./components/Versionen";
 import { useStoredState } from "./useStoredState";
 import { ASSETS_GEAENDERT } from "./editor/grafikBlock";
-import { api, fehlerText, heute, type Aenderung, type NotizInfo, type Treffer } from "./api";
+import { api, fehlerText, heute, type Aenderung, type NotizInfo, type SicherungsStand, type Treffer } from "./api";
 
 function App() {
   const [ordnerNamen, setOrdnerNamen] = useState<string[] | null>(null);
@@ -20,6 +21,8 @@ function App() {
   const [meldung, setMeldung] = useState<string | null>(null);
   const [statusText, setStatusText] = useState<string | null>(null);
   const [sucheOffen, setSucheOffen] = useState(false);
+  const [versionenOffen, setVersionenOffen] = useState(false);
+  const [sicherung, setSicherung] = useState<SicherungsStand | null>(null);
   // Notiz, die nach einem Ordnerwechsel (aus der Suche) ausgewählt werden soll
   const auswahlNachOrdnerwechsel = useRef<string | null>(null);
 
@@ -108,6 +111,29 @@ function App() {
       window.removeEventListener("blockbuch:status", s);
     };
   }, [melde]);
+
+  // Stand der automatischen Sicherung (Rust meldet nach jeder Sicherung)
+  useEffect(() => {
+    let aktiv = true;
+    let abmelden: (() => void) | undefined;
+    listen<SicherungsStand>("sicherung", (e) => setSicherung(e.payload)).then((f) => (aktiv ? (abmelden = f) : f()));
+    return () => {
+      aktiv = false;
+      abmelden?.();
+    };
+  }, []);
+
+  /** ⌘S: Eingaben sofort speichern und eine Sicherung anlegen */
+  async function jetztSichern() {
+    try {
+      await editorRef.current?.speichernJetzt();
+      await api.jetztSichern();
+      setStatusText("Gesichert ✓");
+      window.setTimeout(() => setStatusText((t) => (t === "Gesichert ✓" ? null : t)), 1500);
+    } catch (e) {
+      melde(e);
+    }
+  }
 
   // ~/Schule öffnen und Lernfeld-Ordner sicherstellen
   useEffect(() => {
@@ -265,6 +291,8 @@ function App() {
     if (id === "neue-notiz") neueNotiz();
     if (id === "ordner-leiste") toggleSidebar();
     if (id === "suchen") setSucheOffen(true);
+    if (id === "versionen" && aktiveDatei) setVersionenOffen(true);
+    if (id === "sichern") jetztSichern();
   };
   useEffect(() => {
     let aktiv = true;
@@ -285,6 +313,16 @@ function App() {
       if (e.altKey && !e.shiftKey && e.code === "KeyS") {
         e.preventDefault();
         if (!e.repeat) toggleSidebar();
+      }
+      // ⌘S: sichern
+      if (!e.altKey && !e.shiftKey && e.code === "KeyS") {
+        e.preventDefault();
+        jetztSichern();
+      }
+      // ⌘⇧H: Versionen
+      if (!e.altKey && e.shiftKey && e.code === "KeyH") {
+        e.preventDefault();
+        if (aktiveDateiRef.current) setVersionenOffen(true);
       }
       // ⌘K: Suche
       if (!e.altKey && !e.shiftKey && e.code === "KeyK") {
@@ -338,6 +376,13 @@ function App() {
         onAuswahl={setAktiverOrdner}
         onWeiter={fokusListe}
         onNeuerOrdner={neuerOrdner}
+        sicherung={
+          sicherung?.fehler
+            ? `⚠︎ Sicherung: ${sicherung.fehler}`
+            : sicherung?.zeit
+              ? `Gesichert ${zeitAnzeigen(sicherung.zeit)}`
+              : null
+        }
       />
       <NoteList
         ref={listeRef}
@@ -369,7 +414,18 @@ function App() {
         onGespeichert={() => ladeNotizen(ordner.name).catch(melde)}
         onZurueck={fokusListe}
         onFehler={melde}
+        onVersionen={() => setVersionenOffen(true)}
       />
+      {versionenOffen && aktiveDatei && ordner && (
+        <Versionen
+          ordner={ordner.name}
+          datei={aktiveDatei}
+          titel={notizen.find((n) => n.datei === aktiveDatei)?.titel ?? aktiveDatei}
+          vorWiederherstellen={() => editorRef.current?.speichernJetzt() ?? Promise.resolve()}
+          onFehler={melde}
+          onSchliessen={() => setVersionenOffen(false)}
+        />
+      )}
       {sucheOffen && (
         <Suche
           ordnerName={(name) => alleOrdner.find((o) => o.name === name)?.anzeige ?? name}

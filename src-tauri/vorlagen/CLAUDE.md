@@ -162,6 +162,19 @@ PDF-Blöcke (```` ```pdf ````).
 **Nicht verwenden:** HTML (`<details>`, `<br>` …), Fußnoten, Unterstreichen, `===`-Überschriften.
 Notizen mit HTML öffnet die App nur schreibgeschützt.
 
+## Versionen (Git)
+
+`~/Schule` ist ein Git-Archiv. Die App sichert automatisch (beim Start, alle 5 Minuten, beim Beenden,
+mit ⌘S). Der Nutzer kann jede Version einer Notiz in der App ansehen und wiederherstellen.
+
+- Lesen ist erlaubt und nützlich: `git log -- <datei>`, `git show <id>:<pfad>`, `git diff`
+  (z. B. „Was habe ich letzte Woche zu Normalformen geschrieben?“ oder eine versehentlich gelöschte
+  Stelle wiederfinden).
+- **Nie** selbst committen, pushen, `reset`, `checkout`, `restore`, `rebase`, `stash`, `clean` oder
+  Branches anlegen/löschen – das kann Arbeit des Nutzers vernichten. Sicherungen macht nur die App.
+  Wenn etwas wiederhergestellt werden soll: den alten Inhalt mit `git show` lesen und wie jede andere
+  Änderung per Edit einfügen.
+
 ## Sonst
 
 - Keine Dateien löschen oder umbenennen, außer der Nutzer bittet ausdrücklich darum.

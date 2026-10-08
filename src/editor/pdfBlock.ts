@@ -2,8 +2,8 @@
 //   ```pdf
 //   src: assets/Arbeitsblatt-Joins.pdf
 //   ```
-// Anzeige mit pdf.js (Seiten als Bilder, erst beim Hinscrollen). Beim Einfügen wird zusätzlich der Text
-// als .txt daneben gespeichert – so findet die Suche ihn, und Claude kann ihn schnell lesen.
+// Anzeige mit pdf.js (Seiten als Bilder, erst beim Hinscrollen). Den Text als .txt daneben legt die App
+// in Rust an (pdftext.rs) – so findet die Suche ihn, und Claude kann ihn schnell lesen.
 import type { Editor } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { NodeView } from "@tiptap/pm/view";
@@ -35,26 +35,6 @@ async function oeffnen(daten: Uint8Array) {
     cMapPacked: true,
     iccUrl: "/pdfjs/iccs/",
   }).promise;
-}
-
-/** Gesamter Text eines PDFs (Seiten durch Leerzeilen getrennt) */
-export async function pdfText(daten: Uint8Array): Promise<string> {
-  const pdf = await oeffnen(daten);
-  try {
-    const seiten: string[] = [];
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const inhalt = await (await pdf.getPage(i)).getTextContent();
-      const text = inhalt.items
-        .map((it) => ("str" in it ? it.str + (it.hasEOL ? "\n" : "") : ""))
-        .join("")
-        .replace(/[ \t]+\n/g, "\n")
-        .trim();
-      seiten.push(`--- Seite ${i} ---\n${text}`);
-    }
-    return seiten.join("\n\n") + "\n";
-  } finally {
-    await pdf.loadingTask.destroy();
-  }
 }
 
 function knopf(text: string, titel: string, aktion: () => void) {

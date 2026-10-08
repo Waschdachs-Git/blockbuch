@@ -4,6 +4,8 @@
 mod beobachter;
 mod grafik;
 mod notizen;
+mod pdftext;
+mod sicherung;
 mod suche;
 
 use notizen::{Ergebnis, NotizInfo, NotizInhalt};
@@ -120,7 +122,19 @@ async fn asset_speichern(app: tauri::AppHandle, request: tauri::ipc::Request<'_>
     let tauri::ipc::InvokeBody::Raw(inhalt) = request.body() else {
         return Err("Erwartet Dateiinhalt als Rohdaten.".into());
     };
-    notizen::asset_speichern(&schule_pfad(&app)?, &kopf("ordner")?, &kopf("name")?, inhalt)
+    let root = schule_pfad(&app)?;
+    let ordner = kopf("ordner")?;
+    let pfad = notizen::asset_speichern(&root, &ordner, &kopf("name")?, inhalt)?;
+    // PDF: Text im Hintergrund als .txt daneben legen (Suche, Claude)
+    if pfad.to_lowercase().ends_with(".pdf") {
+        let pdf = root.join(&ordner).join(&pfad);
+        std::thread::spawn(move || {
+            if let Err(e) = pdftext::txt_erzeugen(&pdf) {
+                eprintln!("[blockbuch] {e}");
+            }
+        });
+    }
+    Ok(pfad)
 }
 
 #[tauri::command]
@@ -147,10 +161,78 @@ async fn suchen(app: tauri::AppHandle, anfrage: String) -> Ergebnis<Vec<suche::T
     Ok(suche::suchen(&schule_pfad(&app)?, &anfrage, 50))
 }
 
+#[tauri::command]
+async fn versionen(app: tauri::AppHandle, ordner: String, datei: String) -> Ergebnis<Vec<sicherung::Version>> {
+    sicherung::versionen(&schule_pfad(&app)?, &ordner, &datei)
+}
+
+#[tauri::command]
+async fn version_lesen(app: tauri::AppHandle, hash: String, pfad: String) -> Ergebnis<String> {
+    sicherung::version_lesen(&schule_pfad(&app)?, &hash, &pfad)
+}
+
+#[tauri::command]
+async fn version_wiederherstellen(
+    app: tauri::AppHandle,
+    ordner: String,
+    datei: String,
+    hash: String,
+    pfad: String,
+) -> Ergebnis<()> {
+    let root = schule_pfad(&app)?;
+    sicherung::wiederherstellen(&root, &ordner, &datei, &hash, &pfad)?;
+    melde_sicherung(&app, &root, None);
+    Ok(())
+}
+
+/// Jetzt sichern (z. B. über das Menü)
+#[tauri::command]
+async fn jetzt_sichern(app: tauri::AppHandle) -> Ergebnis<Option<String>> {
+    let root = schule_pfad(&app)?;
+    let r = sicherung::sichern(&root, "Manuelle Sicherung");
+    melde_sicherung(&app, &root, r.as_ref().err().cloned());
+    r
+}
+
+/// Teilt der Oberfläche den Stand der letzten Sicherung mit (Zeit oder Fehler)
+fn melde_sicherung(app: &tauri::AppHandle, root: &std::path::Path, fehler: Option<String>) {
+    let zeit = sicherung::letzte_sicherung(root);
+    let _ = app.emit("sicherung", serde_json::json!({ "zeit": zeit, "fehler": fehler }));
+}
+
+const SICHERUNG_ALLE: Duration = Duration::from_secs(5 * 60);
+
+/// Hintergrund: Archiv einrichten, beim Start und dann alle 5 Minuten sichern
+fn sicherung_starten(app: tauri::AppHandle, root: PathBuf) {
+    std::thread::spawn(move || {
+        if let Err(e) = sicherung::einrichten(&root) {
+            eprintln!("[blockbuch] Sicherung nicht verfügbar: {e}");
+            melde_sicherung(&app, &root, Some(e));
+            return;
+        }
+        let mut grund = "Beim Start";
+        loop {
+            let r = sicherung::sichern(&root, grund);
+            if let Err(e) = &r {
+                eprintln!("[blockbuch] Sicherung fehlgeschlagen: {e}");
+            }
+            melde_sicherung(&app, &root, r.err());
+            grund = "Automatische Sicherung";
+            std::thread::sleep(SICHERUNG_ALLE);
+        }
+    });
+}
+
 /// Von der Oberfläche aufgerufen, nachdem alles gesichert ist
 #[tauri::command]
 fn beenden(app: tauri::AppHandle) {
     eprintln!("[blockbuch] Oberfläche hat gesichert – beende");
+    // Letzte Sicherung ins Archiv (kurz, nur wenn sich etwas geändert hat)
+    if let Ok(root) = schule_pfad(&app) {
+        if let Err(e) = sicherung::sichern(&root, "Beim Beenden") {
+            eprintln!("[blockbuch] Sicherung beim Beenden fehlgeschlagen: {e}");
+        }
+    }
     BEENDEN_ERLAUBT.store(true, Ordering::SeqCst);
     app.exit(0);
 }
@@ -203,6 +285,10 @@ pub fn run() {
             asset_lesen,
             in_vorschau_oeffnen,
             suchen,
+            versionen,
+            version_lesen,
+            version_wiederherstellen,
+            jetzt_sichern,
             beenden,
             notiz_erstellen,
             notiz_umbenennen,
@@ -218,6 +304,15 @@ pub fn run() {
             if let Err(e) = std::fs::create_dir_all(&root) {
                 eprintln!("[blockbuch] ~/Schule konnte nicht angelegt werden: {e}");
             }
+            sicherung_starten(h.clone(), root.clone());
+            // PDFs ohne .txt (ältere, oder von Claude abgelegt) nachträglich auslesen
+            let root_pdf = root.clone();
+            std::thread::spawn(move || {
+                let n = pdftext::fehlende_erzeugen(&root_pdf);
+                if n > 0 {
+                    eprintln!("[blockbuch] Text für {n} PDF(s) nachträglich ausgelesen");
+                }
+            });
             match beobachter::starten(h.clone(), root) {
                 Ok(b) => {
                     app.manage(b);
@@ -252,6 +347,13 @@ pub fn run() {
             let ablage = SubmenuBuilder::new(h, "Ablage")
                 .item(&MenuItemBuilder::with_id("neue-notiz", "Neue Notiz").accelerator("CmdOrCtrl+N").build(h)?)
                 .item(&MenuItemBuilder::with_id("suchen", "Suchen …").accelerator("CmdOrCtrl+K").build(h)?)
+                .separator()
+                .item(&MenuItemBuilder::with_id("sichern", "Jetzt sichern").accelerator("CmdOrCtrl+S").build(h)?)
+                .item(
+                    &MenuItemBuilder::with_id("versionen", "Versionen dieser Notiz …")
+                        .accelerator("CmdOrCtrl+Shift+H")
+                        .build(h)?,
+                )
                 .build()?;
             let darstellung = SubmenuBuilder::new(h, "Darstellung")
                 .item(
