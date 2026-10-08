@@ -1,6 +1,8 @@
 // Nur für die Entwicklung im normalen Browser (ohne Tauri): simuliert die Rust-Befehle
 // mit einem Dateisystem im Speicher. Wird in der echten App nie geladen.
 
+import { falten } from "../editor/falten";
+
 type Fs = Record<string, Record<string, string>>;
 
 const fs: Fs = {
@@ -126,14 +128,14 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
       return null;
     case "suchen": {
       // einfache Nachbildung der Rust-Suche (ohne Umlaut-Faltung)
-      const woerter = String(a.anfrage).toLowerCase().split(/\s+/).filter(Boolean);
+      const woerter = falten(String(a.anfrage)).split(/\s+/).filter((w) => w && !/^lf\d+$/.test(w) && !w.startsWith("#"));
       const treffer = [];
       for (const [o, dateien] of Object.entries(fs)) {
         for (const [d, inhalt] of Object.entries(dateien)) {
           if (!d.endsWith(".md") || d.includes("/")) continue;
-          const t = inhalt.toLowerCase();
+          const t = falten(inhalt);
           if (!woerter.every((w) => t.includes(w))) continue;
-          const zeile = inhalt.split("\n").find((z) => !z.startsWith("# ") && woerter.some((w) => z.toLowerCase().includes(w))) ?? "";
+          const zeile = inhalt.split("\n").find((z) => !z.startsWith("# ") && woerter.some((w) => falten(z).includes(w))) ?? "";
           const i = info(d, inhalt);
           treffer.push({ ordner: o, datei: d, titel: i.titel, datum: i.datum, ausschnitt: zeile.replace(/^[#>\-\s]+/, ""), art: "notiz", pdf: null });
         }

@@ -24,21 +24,48 @@ pub struct Treffer {
     punkte: u32,
     #[serde(skip)]
     geaendert: u64,
+    #[serde(skip)]
+    text: String,
 }
 
-/// Vergleichsform: klein, Umlaute vereinheitlicht ("Größe", "groesse", "Grosse" → "grosse")
-pub fn falten(text: &str) -> String {
-    let mut s = String::with_capacity(text.len());
-    for c in text.chars().flat_map(char::to_lowercase) {
-        match c {
-            'ä' => s.push('a'),
-            'ö' => s.push('o'),
-            'ü' => s.push('u'),
-            'ß' => s.push_str("ss"),
-            _ => s.push(c),
+/// Vergleichsform: klein, Umlaute ausgeschrieben ("Größe" und "groesse" → "groesse").
+/// Bewusst nur in diese Richtung: "Queue", "aktuell", "Bar"/"Bär" bleiben unterscheidbar.
+/// Liefert zu jedem Zeichen der gefalteten Form den Zeichenindex im Original (für Ausschnitte).
+pub fn falten_mit_index(text: &str) -> (Vec<char>, Vec<usize>) {
+    let mut zeichen = Vec::with_capacity(text.len());
+    let mut herkunft = Vec::with_capacity(text.len());
+    for (i, c) in text.chars().enumerate() {
+        for k in c.to_lowercase() {
+            let ersatz: &[char] = match k {
+                'ä' => &['a', 'e'],
+                'ö' => &['o', 'e'],
+                'ü' => &['u', 'e'],
+                'ß' => &['s', 's'],
+                _ => {
+                    zeichen.push(k);
+                    herkunft.push(i);
+                    continue;
+                }
+            };
+            for &e in ersatz {
+                zeichen.push(e);
+                herkunft.push(i);
+            }
         }
     }
-    s.replace("ae", "a").replace("oe", "o").replace("ue", "u")
+    (zeichen, herkunft)
+}
+
+pub fn falten(text: &str) -> String {
+    falten_mit_index(text).0.into_iter().collect()
+}
+
+/// Position (in gefalteten Zeichen) des ersten Vorkommens von `wort`
+fn finde(gefaltet: &[char], wort: &[char]) -> Option<usize> {
+    if wort.is_empty() || wort.len() > gefaltet.len() {
+        return None;
+    }
+    (0..=gefaltet.len() - wort.len()).find(|&i| gefaltet[i..i + wort.len()] == *wort)
 }
 
 /// Markdown-Zeichen am Zeilenanfang entfernen, damit der Ausschnitt lesbar ist
@@ -56,7 +83,10 @@ fn ausschnitt(text: &str, woerter: &[String]) -> String {
     let beste = text
         .lines()
         .filter(|z| !z.trim_start().starts_with("# "))
-        .map(|z| (woerter.iter().filter(|w| falten(z).contains(w.as_str())).count(), z))
+        .map(|z| {
+            let f = falten(z);
+            (woerter.iter().filter(|w| f.contains(w.as_str())).count(), z)
+        })
         .filter(|(n, z)| *n > 0 && !lesbar(z).is_empty())
         .fold(None::<(usize, &str)>, |best, (n, z)| match best {
             Some((m, _)) if m >= n => best,
@@ -68,9 +98,13 @@ fn ausschnitt(text: &str, woerter: &[String]) -> String {
     if zeichen.len() <= 140 {
         return lesbar;
     }
-    // Fundstelle ungefähr in die Mitte (Position in der gefalteten Form ist eine Näherung)
-    let pos = falten(&lesbar).find(woerter[0].as_str()).unwrap_or(0);
-    let pos_zeichen = lesbar.get(..pos.min(lesbar.len())).map(|s| s.chars().count()).unwrap_or(0);
+    // Fundstelle in die Mitte – über die Zuordnung gefaltet → Original (Umlaute, Emojis sicher)
+    let (gefaltet, herkunft) = falten_mit_index(&lesbar);
+    let pos_zeichen = woerter
+        .iter()
+        .find_map(|w| finde(&gefaltet, &w.chars().collect::<Vec<_>>()))
+        .map(|i| herkunft[i])
+        .unwrap_or(0);
     let start = pos_zeichen.saturating_sub(50);
     let ende = (start + 140).min(zeichen.len());
     let mut s: String = zeichen[start..ende].iter().collect();
@@ -86,6 +120,7 @@ fn ausschnitt(text: &str, woerter: &[String]) -> String {
 /// Bewertung: alle Wörter müssen vorkommen; Titel zählt viel, Überschriften mehr als Text
 fn bewerten(titel: &str, text: &str, woerter: &[String]) -> Option<u32> {
     let (t, x) = (falten(titel), falten(text));
+    let ueberschriften: Vec<String> = text.lines().filter(|z| z.trim_start().starts_with('#')).map(falten).collect();
     let mut punkte = 0;
     for w in woerter {
         let im_titel = t.contains(w.as_str());
@@ -97,33 +132,73 @@ fn bewerten(titel: &str, text: &str, woerter: &[String]) -> Option<u32> {
             punkte += 20;
         }
         punkte += im_text.min(10);
-        let in_ueberschrift = text
-            .lines()
-            .filter(|z| z.trim_start().starts_with('#'))
-            .any(|z| falten(z).contains(w.as_str()));
-        if in_ueberschrift {
+        if ueberschriften.iter().any(|z| z.contains(w.as_str())) {
             punkte += 8;
         }
     }
     Some(punkte)
 }
 
-fn ohne_frontmatter(inhalt: &str) -> &str {
+/// (Frontmatter, Rest) – der Rest beginnt nach der schließenden "---"-Zeile
+fn teile(inhalt: &str) -> (&str, &str) {
     if let Some(rest) = inhalt.strip_prefix("---\n").or_else(|| inhalt.strip_prefix("---\r\n")) {
         if let Some(ende) = rest.find("\n---") {
-            return rest[ende + 4..].trim_start_matches(['-', '\r', '\n']);
+            let nach = &rest[ende + 4..];
+            let zeilenende = nach.find('\n').map(|i| i + 1).unwrap_or(nach.len());
+            return (&rest[..ende], &nach[zeilenende..]);
         }
     }
-    inhalt
+    ("", inhalt)
 }
 
+/// Tags aus dem Frontmatter, z. B. "tags: [sql, joins]" → ["sql", "joins"]
+fn tags(frontmatter: &str) -> Vec<String> {
+    frontmatter
+        .lines()
+        .find_map(|z| z.trim().strip_prefix("tags:"))
+        .map(|t| {
+            t.trim()
+                .trim_matches(['[', ']'])
+                .split(',')
+                .map(|x| falten(x.trim().trim_matches(['"', '\'', '#'])))
+                .filter(|x| !x.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Lernfeld-Filter aus der Anfrage: "lf5", "LF05" → "lf05"
+fn lernfeld_filter(wort: &str) -> Option<String> {
+    let n: u32 = wort.strip_prefix("lf")?.parse().ok()?;
+    (1..=12).contains(&n).then(|| format!("lf{n:02}"))
+}
+
+/// Anfrage-Syntax: normale Wörter (alle müssen vorkommen), "lf5" = nur Lernfeld 5,
+/// "#sql" = nur Notizen mit Tag sql. Einzelne Buchstaben werden ignoriert (treffen fast alles),
+/// Marker wie ❓ und 🙋 gehen als ganz normale Suchwörter.
 pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
-    let woerter: Vec<String> = falten(anfrage).split_whitespace().map(String::from).collect();
+    let mut woerter: Vec<String> = Vec::new();
+    let mut lernfeld: Option<String> = None;
+    let mut tag_filter: Vec<String> = Vec::new();
+    for w in falten(anfrage).split_whitespace() {
+        if let Some(lf) = lernfeld_filter(w) {
+            lernfeld = Some(lf);
+        } else if let Some(t) = w.strip_prefix('#').filter(|t| !t.is_empty()) {
+            tag_filter.push(t.to_string());
+        } else if w.chars().count() >= 2 || !w.chars().all(char::is_alphanumeric) {
+            woerter.push(w.to_string());
+        }
+    }
     let mut treffer = Vec::new();
 
     for ordner in ordner_liste(root).unwrap_or_default() {
         if ordner == "Gerettet" {
             continue; // Konfliktkopien nicht in der Suche
+        }
+        if let Some(lf) = &lernfeld {
+            if !falten(&ordner).starts_with(lf.as_str()) {
+                continue;
+            }
         }
         let pfad = root.join(&ordner);
         let Ok(eintraege) = fs::read_dir(&pfad) else { continue };
@@ -134,20 +209,30 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
             if name.starts_with('.') || !name.ends_with(".md") {
                 continue;
             }
-            let (Ok(info), Ok(inhalt)) = (lies_info(&e.path()), fs::read_to_string(e.path())) else { continue };
+            let Ok(info) = lies_info(&e.path()) else { continue };
+            // ungültiges UTF-8 nicht still überspringen
+            let Ok(roh) = fs::read(e.path()) else { continue };
+            let inhalt = String::from_utf8_lossy(&roh).into_owned();
             notizen.push((info.datei, info.titel, info.datum, inhalt, info.geaendert));
         }
 
         for (datei, titel, datum, inhalt, geaendert) in &notizen {
-            let text = ohne_frontmatter(inhalt);
-            let punkte = if woerter.is_empty() { Some(0) } else { bewerten(titel, text, &woerter) };
+            let (frontmatter, text) = teile(inhalt);
+            let notiz_tags = tags(frontmatter);
+            if !tag_filter.iter().all(|t| notiz_tags.iter().any(|n| n.starts_with(t.as_str()))) {
+                continue;
+            }
+            // Tags zählen wie Titelwörter
+            let titel_und_tags = format!("{titel} {}", notiz_tags.join(" "));
+            let punkte = if woerter.is_empty() { Some(0) } else { bewerten(&titel_und_tags, text, &woerter) };
             if let Some(punkte) = punkte {
                 treffer.push(Treffer {
                     ordner: ordner.clone(),
                     datei: Some(datei.clone()),
                     titel: titel.clone(),
                     datum: datum.clone(),
-                    ausschnitt: if woerter.is_empty() { String::new() } else { ausschnitt(text, &woerter) },
+                    ausschnitt: String::new(),
+                    text: text.to_string(),
                     art: "notiz",
                     pdf: None,
                     punkte,
@@ -156,8 +241,8 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
             }
         }
 
-        // PDF-Texte (assets/*.txt neben einem PDF)
-        if woerter.is_empty() {
+        // PDF-Texte (assets/*.txt neben einem PDF) – nicht bei reinen Tag-Filtern
+        if woerter.is_empty() || !tag_filter.is_empty() {
             continue;
         }
         let Ok(assets) = fs::read_dir(pfad.join("assets")) else { continue };
@@ -168,7 +253,8 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
             if !pfad.join("assets").join(&pdf_name).exists() {
                 continue;
             }
-            let Ok(text) = fs::read_to_string(e.path()) else { continue };
+            let Ok(roh) = fs::read(e.path()) else { continue };
+            let text = String::from_utf8_lossy(&roh).into_owned();
             let Some(punkte) = bewerten(&pdf_name, &text, &woerter) else { continue };
             let pdf_pfad = format!("assets/{pdf_name}");
             // Notiz finden, in der das PDF eingebunden ist
@@ -178,7 +264,8 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
                 datei: einbindung.map(|n| n.0.clone()),
                 titel: pdf_name.clone(),
                 datum: einbindung.map(|n| n.2.clone()).unwrap_or_default(),
-                ausschnitt: ausschnitt(&text, &woerter),
+                ausschnitt: String::new(),
+                text,
                 art: "pdf",
                 pdf: Some(pdf_pfad),
                 punkte,
@@ -187,13 +274,19 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
         }
     }
 
-    // Ohne Suchbegriff: zuletzt bearbeitete Notizen
+    // Ohne Suchwörter (leer oder nur Filter): zuletzt bearbeitete Notizen
     if woerter.is_empty() {
         treffer.sort_by_key(|t| std::cmp::Reverse(t.geaendert));
     } else {
         treffer.sort_by(|a, b| b.punkte.cmp(&a.punkte).then(b.datum.cmp(&a.datum)));
     }
     treffer.truncate(max);
+    // Ausschnitte erst jetzt – nur für die angezeigten Treffer
+    if !woerter.is_empty() {
+        for t in &mut treffer {
+            t.ausschnitt = ausschnitt(&t.text, &woerter);
+        }
+    }
     treffer
 }
 
@@ -225,6 +318,33 @@ mod tests {
         assert_eq!(falten("Größe"), falten("groesse"));
         assert_eq!(falten("Größe"), falten("Grösse"));
         assert_eq!(falten("Abhängigkeit"), falten("abhaengigkeit"));
+        // keine Verwässerung
+        assert_eq!(falten("Queue"), "queue");
+        assert_eq!(falten("aktuell"), "aktuell");
+        assert_ne!(falten("Bar"), falten("Bär"));
+    }
+
+    #[test]
+    fn ausschnitt_zeigt_fundstelle_auch_nach_umlauten_und_emojis() {
+        let lang = format!("{} Mauer 😀 Queue Größe {}", "äöü ".repeat(30), "x ".repeat(80));
+        let a = ausschnitt(&format!("{lang}transitive Abhängigkeit"), &["transitive".to_string()]);
+        assert!(a.contains("transitive"), "{a}");
+        let b = ausschnitt(&lang, &["queue".to_string()]);
+        assert!(b.contains("Queue"), "{b}");
+    }
+
+    #[test]
+    fn filter_lernfeld_tags_und_marker() {
+        let (_t, root) = schule();
+        fs::write(root.join("LF05/2026-10-09-Tags.md"), "---\ndatum: 2026-10-09\ntags: [sql, uebung]\n---\n\n# Übung\n\nWas ist ein Schlüssel? ❓\n").unwrap();
+        assert!(suchen(&root, "lf9 join", 20).iter().all(|t| t.ordner == "LF09"));
+        assert_eq!(suchen(&root, "lf9 join", 20).len(), 1);
+        let t = suchen(&root, "#sql", 20);
+        assert_eq!(t.len(), 1);
+        assert_eq!(t[0].titel, "Übung");
+        assert_eq!(suchen(&root, "❓", 20).len(), 1);
+        assert_eq!(suchen(&root, "uebung", 20).len(), 1, "Tags zählen wie Titel");
+        assert!(!suchen(&root, "a", 20).is_empty(), "einzelner Buchstabe = wie leer");
     }
 
     #[test]

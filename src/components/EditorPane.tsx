@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { MARKER_FRAGEN, MARKER_UNKLAR, zaehleMarker } from "../editor/kaesten";
 import { setzeGrafikOrdner } from "../editor/grafikBlock";
+import { fundstellen } from "../editor/falten";
 import { api, fehlerText, istKonflikt } from "../api";
 import { aufraeumen, setzeZusammen, wuerdeInhaltVerlieren, zerlege, type NotizDatei } from "../editor/datei";
 import { editorErweiterungen } from "../editor/erweiterungen";
@@ -310,21 +311,24 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   // Beim Schließen der Ansicht nichts verlieren
   useEffect(() => () => void sichernVorWeggang(), [editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Erste Stelle suchen, an der eines der Wörter vorkommt (ohne Groß/klein), markieren und hinscrollen */
+  /** Erste Fundstelle eines der Wörter markieren und hinscrollen. Sucht pro Absatz über den ganzen Text
+   *  (auch über Formatierungsgrenzen wie **SQL**-Joins) und mit der Umlaut-Regel der Suche. */
   function springe(woerter: string[]) {
     if (!editor) return;
-    const klein = woerter.map((w) => w.toLowerCase()).filter(Boolean);
     let ziel: { from: number; to: number } | null = null;
-    editor.state.doc.descendants((n, pos) => {
-      if (ziel || !n.isText || !n.text) return !ziel;
-      const t = n.text.toLowerCase();
-      for (const w of klein) {
-        const i = t.indexOf(w);
-        if (i >= 0) {
-          ziel = { from: pos + i, to: pos + i + w.length };
-          break;
-        }
-      }
+    editor.state.doc.descendants((block, blockPos) => {
+      if (ziel) return false;
+      if (!block.isTextblock) return true;
+      // Text des Absatzes + Dokumentposition jeder UTF-16-Einheit
+      let text = "";
+      const positionen: number[] = [];
+      block.forEach((kind, offset) => {
+        if (!kind.isText || !kind.text) return;
+        for (let i = 0; i < kind.text.length; i++) positionen.push(blockPos + 1 + offset + i);
+        text += kind.text;
+      });
+      const [erste] = fundstellen(text, woerter);
+      if (erste) ziel = { from: positionen[erste[0]], to: positionen[erste[1] - 1] + 1 };
       return false;
     });
     if (ziel) editor.chain().focus().setTextSelection(ziel).scrollIntoView().run();

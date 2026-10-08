@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, datumAnzeigen, fehlerText, type Treffer } from "../api";
+import { fundstellen } from "../editor/falten";
 
 type Props = {
   ordnerName: (ordner: string) => string;
@@ -7,12 +8,24 @@ type Props = {
   onSchliessen: () => void;
 };
 
-/** Suchbegriffe im Ausschnitt hervorheben (einfach, ohne Umlaut-Faltung) */
+/** Suchbegriffe hervorheben – mit derselben Umlaut-Regel wie die Suche ("groesse" markiert "Größe") */
 function hervorheben(text: string, woerter: string[]) {
-  const muster = woerter.filter((w) => w.length > 1).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  if (!muster.length) return text;
-  const teile = text.split(new RegExp(`(${muster.join("|")})`, "gi"));
-  return teile.map((t, i) => (i % 2 === 1 ? <mark key={i}>{t}</mark> : t));
+  const teile: React.ReactNode[] = [];
+  let ab = 0;
+  fundstellen(text, woerter).forEach(([s, e], i) => {
+    teile.push(text.slice(ab, s), <mark key={i}>{text.slice(s, e)}</mark>);
+    ab = e;
+  });
+  teile.push(text.slice(ab));
+  return teile;
+}
+
+/** Suchwörter ohne Filter (lf5, #tag) – für Hervorhebung und Sprung */
+function suchwoerter(anfrage: string): string[] {
+  return anfrage
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w && !/^lf\d{1,2}$/i.test(w) && !w.startsWith("#"));
 }
 
 export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
@@ -21,11 +34,24 @@ export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
   const [auswahl, setAuswahl] = useState(0);
   const [fehler, setFehler] = useState<string | null>(null);
   const listeRef = useRef<HTMLUListElement>(null);
-  const woerter = anfrage.trim().split(/\s+/).filter(Boolean);
+  const woerter = suchwoerter(anfrage);
+  const [laedt, setLaedt] = useState(false);
+  // Fokus beim Schließen dorthin zurück, wo er vorher war (z. B. Cursor im Editor)
+  const vorherFokus = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
+  useEffect(
+    () => () => {
+      // nur zurücksetzen, wenn der Fokus "verloren" ist – nicht, wenn der Sprung ihn schon in den Editor gesetzt hat
+      // (beim Aufräumen steht das Suchfeld evtl. noch im DOM – dann gilt der Fokus auch als verloren)
+      const a = document.activeElement;
+      if (!a || a === document.body || a.closest(".suche")) vorherFokus.current?.focus?.();
+    },
+    [],
+  );
 
   // Suchen (leicht verzögert, damit nicht bei jedem Tastendruck gesucht wird)
   useEffect(() => {
     let abgebrochen = false;
+    setLaedt(true);
     const t = window.setTimeout(
       () => {
         api
@@ -35,6 +61,7 @@ export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
             setTreffer(liste);
             setAuswahl(0);
             setFehler(null);
+            setLaedt(false);
           })
           .catch((e) => !abgebrochen && setFehler(fehlerText(e)));
       },
@@ -60,7 +87,7 @@ export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setAuswahl((a) => Math.max(a - 1, 0));
-    } else if (e.key === "Enter" && treffer[auswahl]) {
+    } else if (e.key === "Enter" && treffer[auswahl] && !laedt) {
       e.preventDefault();
       onOeffnen(treffer[auswahl], woerter);
     }
@@ -72,15 +99,20 @@ export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
         <input
           className="suche__eingabe"
           autoFocus
-          placeholder="In allen Notizen und PDFs suchen …"
+          placeholder="Suchen … (lf5 = nur Lernfeld 5, #sql = Tag, ❓ = offene Fragen)"
           aria-label="Suchbegriff"
+          role="combobox"
+          aria-expanded={treffer.length > 0}
+          aria-autocomplete="list"
           aria-controls="suche-ergebnisse"
           aria-activedescendant={treffer[auswahl] ? `treffer-${auswahl}` : undefined}
           value={anfrage}
           onChange={(e) => setAnfrage(e.target.value)}
           onKeyDown={onKeyDown}
         />
-        <div className="suche__kopf">{anfrage.trim() ? `${treffer.length} Treffer` : "Zuletzt bearbeitet"}</div>
+        <div className="suche__kopf" aria-live="polite">
+          {woerter.length ? `${treffer.length} Treffer` : "Zuletzt bearbeitet"}
+        </div>
         {fehler && <p className="suche__leer">Fehler: {fehler}</p>}
         {!fehler && anfrage.trim() && treffer.length === 0 && <p className="suche__leer">Nichts gefunden.</p>}
         <ul className="suche__liste" id="suche-ergebnisse" role="listbox" ref={listeRef}>
