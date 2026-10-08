@@ -32,8 +32,10 @@ verstanden hat.
 
 - **Ändere Notizen nur durch Einfügen** (Edit-Werkzeug, gezielte Stellen). Schreibe eine vorhandene
   Notiz **nie komplett neu** (kein Write auf vorhandene Notizen, nichts aus dem Gedächtnis nachtippen).
-  Über den Dateizugriff-Connector („blockbuch-notizen“) heißt das: vorhandene Dateien nur mit
-  `edit_file`, `write_file` nur für neue Dateien. Pfade immer absolut (`/Users/…/Schule/LF2/…`).
+  Das gilt für jeden Zugriffsweg (Claude Code, freigegebener Ordner in der Claude-App, Connector):
+  Nimm immer das Werkzeug, das **gezielt eine Stelle ersetzt oder einfügt** (z. B. Edit, `edit_file`,
+  „str_replace“). Werkzeuge, die eine Datei komplett schreiben (Write, `write_file`, „create“), nur für
+  **neue** Dateien. Gibt es kein gezieltes Werkzeug, lieber nachfragen als die Notiz neu zu schreiben.
 - Erlaubt sind nur: Claude-Kästen einfügen, eigene Claude-Kästen aktualisieren, `❓` → `✅`,
   Karten in einen `[!karten]`-Kasten anhängen, neue Notizen anlegen.
 - Fehler in der Mitschrift nicht korrigieren, sondern in einem Claude-Kasten darunter erklären
