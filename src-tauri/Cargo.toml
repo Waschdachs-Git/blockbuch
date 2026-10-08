@@ -2,7 +2,7 @@
 name = "blockbuch"
 version = "0.1.0"
 description = "Notiz- und Lern-App für Berufsschul-Blöcke"
-authors = ["you"]
+authors = ["Natanael Haase"]
 edition = "2021"
 license = "MIT"
 
