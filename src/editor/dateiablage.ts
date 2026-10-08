@@ -1,6 +1,9 @@
-// Bilder und PDFs in Notizen: per Drag & Drop, Einfügen (⌘V – auch Screenshots und Fotos vom iPhone
-// über „Von iPhone importieren“) oder über das /-Menü. Die Datei landet in <Ordner>/assets/,
-// in der Notiz steht ein Verweis: ![Name](assets/x.png) bzw. ein ```pdf-Block.
+// Bilder, PDFs und Grafiken in Notizen: per Drag & Drop, Einfügen (⌘V – auch Screenshots und Fotos vom
+// iPhone über „Von iPhone importieren“) oder über das /-Menü. Die Datei landet in <Ordner>/assets/,
+// in der Notiz steht ein Verweis: ![Name](assets/x.png), ein ```pdf- bzw. ```grafik-Block (HTML).
+//
+// Außerdem: Markdown-Text einfügen (z. B. über „Kopieren“ in claude.ai) wird als formatierter Text
+// übernommen statt mit sichtbaren ## und **.
 import { Extension, type Editor } from "@tiptap/core";
 import Image from "@tiptap/extension-image";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
@@ -8,10 +11,19 @@ import { api, fehlerText, heute } from "../api";
 import { grafikAdresse, grafikOrdner, notizSitzung } from "./grafikBlock";
 
 const BILD = /^image\/(png|jpe?g|gif|webp|svg\+xml|heic)$/;
-const ERLAUBT = /\.(png|jpe?g|gif|webp|svg|heic|pdf)$/i;
+const ERLAUBT = /\.(png|jpe?g|gif|webp|svg|heic|pdf|html?)$/i;
 
 export function istAblegbar(datei: File): boolean {
   return BILD.test(datei.type) || datei.type === "application/pdf" || ERLAUBT.test(datei.name);
+}
+
+/** Sieht ein eingefügter Text nach Markdown aus? (Überschriften, Listen, Tabellen, Code, Kästen …) */
+export function siehtAusWieMarkdown(text: string): boolean {
+  const zeilen = text.split("\n");
+  if (zeilen.length < 2 && !/^#{1,6} /.test(text)) return false;
+  const muster = /^(#{1,6} |\s*[-*+] |\s*\d+\. |> |```|~~~|\|.*\|\s*$|\s*- \[[ xX]\] )/;
+  const treffer = zeilen.filter((z) => muster.test(z)).length;
+  return treffer >= 1 && (treffer >= 2 || /\*\*[^*]+\*\*|^#{1,6} /m.test(text));
 }
 
 const MAX_BYTES = 100 * 1024 * 1024;
@@ -80,11 +92,20 @@ async function einfuegenEine(
       meldeFehler(`Gespeichert als ${ordner}/${pfad}, aber nicht eingefügt (Notiz wurde gewechselt).`);
       return;
     }
-    const istPdf = pfad.toLowerCase().endsWith(".pdf");
-    const knoten = istPdf
-      ? { type: "codeBlock", attrs: { language: "pdf" }, content: [{ type: "text", text: `src: ${pfad}` }] }
-      : // eckige Klammern würden das Markdown ![…](…) zerbrechen
-        { type: "image", attrs: { src: pfad, alt: name.replace(/\.\w+$/, "").replace(/[[\]]/g, "") } };
+    const endung = pfad.toLowerCase().split(".").pop();
+    const block = (sprache: string, text: string) => ({
+      type: "codeBlock",
+      attrs: { language: sprache },
+      content: [{ type: "text", text }],
+    });
+    const knoten =
+      endung === "pdf"
+        ? block("pdf", `src: ${pfad}`)
+        : endung === "html" || endung === "htm"
+          ? // HTML (z. B. Grafik-Artefakt aus claude.ai) → lebendige Grafik
+            block("grafik", `src: ${pfad}\nhöhe: 400`)
+          : // eckige Klammern würden das Markdown ![…](…) zerbrechen
+            { type: "image", attrs: { src: pfad, alt: name.replace(/\.\w+$/, "").replace(/[[\]]/g, "") } };
     const pos = Math.min(ziel(), editor.state.doc.content.size);
     editor.chain().insertContentAt(pos, knoten).run();
     setzeZiel(editor.state.selection.to);
@@ -99,7 +120,7 @@ export function dateiAuswaehlen(editor: Editor) {
   const eingabe = document.createElement("input");
   eingabe.type = "file";
   eingabe.multiple = true;
-  eingabe.accept = "image/*,application/pdf";
+  eingabe.accept = "image/*,application/pdf,.html,.htm";
   eingabe.addEventListener("change", () => {
     if (eingabe.files?.length) dateienEinfuegen(editor, [...eingabe.files]);
   });
@@ -119,7 +140,7 @@ export const Dateiablage = Extension.create({
             const dateien = alle.filter(istAblegbar);
             if (alle.length && !dateien.length) {
               event.preventDefault();
-              meldeFehler(`„${alle[0].name}“ wird nicht unterstützt – nur Bilder und PDFs.`);
+              meldeFehler(`„${alle[0].name}“ wird nicht unterstützt – nur Bilder, PDFs und HTML-Grafiken.`);
               return true;
             }
             if (!dateien.length) return false;
@@ -130,7 +151,17 @@ export const Dateiablage = Extension.create({
           },
           handlePaste: (_view, event) => {
             const dateien = [...(event.clipboardData?.files ?? [])].filter(istAblegbar);
-            if (!dateien.length) return false;
+            if (!dateien.length) {
+              // Reiner Markdown-Text (z. B. "Kopieren" in claude.ai) → formatiert einfügen
+              const html = event.clipboardData?.getData("text/html") ?? "";
+              const text = event.clipboardData?.getData("text/plain") ?? "";
+              if (!html && !editor.isActive("codeBlock") && siehtAusWieMarkdown(text)) {
+                event.preventDefault();
+                editor.commands.insertContent(text, { contentType: "markdown" });
+                return true;
+              }
+              return false;
+            }
             // Excel/Word/Pages legen neben Text oft ein Vorschaubild ab – dann lieber den Text nehmen
             const html = event.clipboardData?.getData("text/html") ?? "";
             const text = event.clipboardData?.getData("text/plain") ?? "";

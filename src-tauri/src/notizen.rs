@@ -490,8 +490,8 @@ pub fn notiz_umbenennen(root: &Path, ordner: &str, datei: &str, titel: &str) -> 
     lies_info(&ordner_p.join(neu_name))
 }
 
-/// Dateitypen, die in assets/ abgelegt werden dürfen (Bilder, PDFs, extrahierter PDF-Text)
-const ASSET_ENDUNGEN: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "heic", "pdf", "txt"];
+/// Dateitypen, die in assets/ abgelegt werden dürfen (Bilder, PDFs, PDF-Text, HTML-Grafiken)
+const ASSET_ENDUNGEN: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "heic", "pdf", "txt", "html", "htm"];
 const ASSET_MAX_BYTES: usize = 100 * 1024 * 1024;
 
 /// Speichert eine eingefügte/abgelegte Datei in <Ordner>/assets/ unter einem freien, lesbaren Namen.
