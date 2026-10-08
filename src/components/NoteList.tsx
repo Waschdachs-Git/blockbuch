@@ -97,7 +97,7 @@ export function NoteList(props: Props) {
         </button>
       </div>
       <header className="notizliste__kopf">
-        <div className="notizliste__lf">{ordner.lernfeld ? `Lernfeld ${ordner.lernfeld.rlp}` : "Fach"}</div>
+        <div className="notizliste__lf">{ordner.lernfeld ? "Lernfeld" : "Fach"}</div>
         <h1 className="notizliste__titel">{ordner.titel}</h1>
       </header>
 

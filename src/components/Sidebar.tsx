@@ -74,16 +74,12 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
           className={`sidebar__eintrag ${istAktiv ? "ist-aktiv" : ""}`}
           aria-current={istAktiv ? "true" : undefined}
           tabIndex={istAktiv ? 0 : -1}
-          title={o.lernfeld ? `Lernfeld ${o.lernfeld.rlp}: ${o.titel}` : o.titel}
+          title={o.titel}
           onClick={() => onAuswahl(o.name)}
         >
-          {o.nummer ? (
-            <span className="sidebar__nummer">{o.nummer}</span>
-          ) : (
-            <span className="sidebar__nummer sidebar__nummer--ordner" aria-hidden="true">
-              <OrdnerIcon />
-            </span>
-          )}
+          <span className="sidebar__nummer sidebar__nummer--ordner" aria-hidden="true">
+            <OrdnerIcon />
+          </span>
           <span className="sidebar__name">{o.anzeige}</span>
         </button>
       </li>

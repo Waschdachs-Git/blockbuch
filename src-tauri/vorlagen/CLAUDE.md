@@ -16,9 +16,9 @@ aktualisieren (Datum, was sitzt, was geübt werden muss). Den Rest der Datei nur
 
 ## Ordner
 
-- Lernfeld-Ordner: vom Nutzer angelegt, Name beginnt mit `LF` + Nummer (z. B. `LF1`, `LF2`, auch
-  `LF5-Datenbanken`). Es gibt nur die Lernfelder, die der Nutzer angelegt hat – keine weiteren anlegen.
-  Titel/Inhalte laut KMK-Rahmenlehrplan FIAE 2020 (LF10–12 = 10a–12a).
+- Lernfeld-Ordner: vom Nutzer angelegt und benannt (`LF1`, `LF2` …). Es gibt nur die Lernfelder, die
+  der Nutzer angelegt hat – keine weiteren Ordner anlegen und keine umbenennen. Inhaltlich orientieren
+  sich die Lernfelder am KMK-Rahmenlehrplan FIAE 2020.
 - weitere Ordner: allgemeine Fächer (z. B. Deutsch, Gemeinschaftskunde, Wirtschaftskunde)
 - `Gerettet/`: Konfliktkopien, die die App angelegt hat – nicht anfassen
 - `assets/` (in einem Ordner): Bilder/Dateien zu Notizen
