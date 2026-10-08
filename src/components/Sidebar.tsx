@@ -12,9 +12,11 @@ type Props = {
   onNeuerOrdner: (name: string) => Promise<boolean>;
   /** Hinweis unten, z. B. "Gesichert heute, 10:42" */
   sicherung: string | null;
+  /** Zusatzinfo als Tooltip (z. B. nicht mitgesicherte Projektordner) */
+  sicherungHinweis: string | null;
 };
 
-export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, onWeiter, onNeuerOrdner, sicherung }: Props) {
+export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, onWeiter, onNeuerOrdner, sicherung, sicherungHinweis }: Props) {
   const navRef = useRef<HTMLElement | null>(null);
   const [neuerOrdner, setNeuerOrdner] = useState<string | null>(null);
   const legtAn = useRef(false);
@@ -139,7 +141,7 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
         </ul>
       </div>
       {sicherung && (
-        <div className={`sidebar__sicherung ${sicherung.startsWith("⚠") ? "ist-fehler" : ""}`} title="Automatische Sicherung (Git) – ⌘S sichert sofort">
+        <div className={`sidebar__sicherung ${sicherung.startsWith("⚠") ? "ist-fehler" : ""}`} title={sicherungHinweis ?? "Automatische Sicherung (Git) – ⌘S sichert sofort, ⇧⌘H zeigt Versionen"}>
           {sicherung}
         </div>
       )}

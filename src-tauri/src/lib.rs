@@ -181,23 +181,39 @@ async fn version_wiederherstellen(
 ) -> Ergebnis<()> {
     let root = schule_pfad(&app)?;
     sicherung::wiederherstellen(&root, &ordner, &datei, &hash, &pfad)?;
-    melde_sicherung(&app, &root, None);
+    melde_sicherung(&app, &root, None, None);
     Ok(())
 }
 
-/// Jetzt sichern (z. B. über das Menü)
+/// Jetzt sichern (⌘S, und vor dem Öffnen der Versionen)
 #[tauri::command]
 async fn jetzt_sichern(app: tauri::AppHandle) -> Ergebnis<Option<String>> {
     let root = schule_pfad(&app)?;
     let r = sicherung::sichern(&root, "Manuelle Sicherung");
-    melde_sicherung(&app, &root, r.as_ref().err().cloned());
-    r
+    melde(&app, &root, &r);
+    r.map(|g| g.id)
 }
 
-/// Teilt der Oberfläche den Stand der letzten Sicherung mit (Zeit oder Fehler)
-fn melde_sicherung(app: &tauri::AppHandle, root: &std::path::Path, fehler: Option<String>) {
+fn melde(app: &tauri::AppHandle, root: &std::path::Path, r: &Ergebnis<sicherung::Gesichert>) {
+    match r {
+        Ok(g) => melde_sicherung(app, root, None, g.hinweis.clone()),
+        Err(e) => melde_sicherung(app, root, Some(e.clone()), None),
+    }
+}
+
+/// Teilt der Oberfläche den Stand der letzten Sicherung mit (Zeit, Fehler, Hinweis)
+fn melde_sicherung(app: &tauri::AppHandle, root: &std::path::Path, fehler: Option<String>, hinweis: Option<String>) {
     let zeit = sicherung::letzte_sicherung(root);
-    let _ = app.emit("sicherung", serde_json::json!({ "zeit": zeit, "fehler": fehler }));
+    // iCloud verträgt sich nicht mit Git-Archiven (Duplikate, ausgelagerte Dateien)
+    let icloud = root
+        .canonicalize()
+        .is_ok_and(|p| p.to_string_lossy().contains("Mobile Documents"))
+        .then(|| "~/Schule liegt in iCloud – das kann das Sicherungsarchiv beschädigen.".to_string());
+    let hinweis = [hinweis, icloud].into_iter().flatten().collect::<Vec<_>>().join(" · ");
+    let _ = app.emit(
+        "sicherung",
+        serde_json::json!({ "zeit": zeit, "fehler": fehler, "hinweis": (!hinweis.is_empty()).then_some(hinweis) }),
+    );
 }
 
 const SICHERUNG_ALLE: Duration = Duration::from_secs(5 * 60);
@@ -207,7 +223,7 @@ fn sicherung_starten(app: tauri::AppHandle, root: PathBuf) {
     std::thread::spawn(move || {
         if let Err(e) = sicherung::einrichten(&root) {
             eprintln!("[blockbuch] Sicherung nicht verfügbar: {e}");
-            melde_sicherung(&app, &root, Some(e));
+            melde_sicherung(&app, &root, Some(e), None);
             return;
         }
         let mut grund = "Beim Start";
@@ -216,7 +232,7 @@ fn sicherung_starten(app: tauri::AppHandle, root: PathBuf) {
             if let Err(e) = &r {
                 eprintln!("[blockbuch] Sicherung fehlgeschlagen: {e}");
             }
-            melde_sicherung(&app, &root, r.err());
+            melde(&app, &root, &r);
             grund = "Automatische Sicherung";
             std::thread::sleep(SICHERUNG_ALLE);
         }

@@ -164,7 +164,7 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
     }
     case "jetzt_sichern":
       for (const [o, d] of Object.entries(fs)) for (const [n, inhalt] of Object.entries(d)) if (n.endsWith(".md")) merkeVersion(o, n, inhalt);
-      setTimeout(() => emit("sicherung", { zeit: new Date().toISOString(), fehler: null }), 50);
+      setTimeout(() => emit("sicherung", { zeit: new Date().toISOString(), fehler: null, hinweis: null }), 50);
       return "abc1234";
     case "notiz_loeschen":
       delete fs[a.ordner][a.datei];

@@ -15,7 +15,7 @@ export type Treffer = {
 };
 export type Version = { hash: string; zeit: string; nachricht: string; pfad: string };
 /** Ereignis "sicherung": Zeitpunkt der letzten Sicherung oder Fehler */
-export type SicherungsStand = { zeit: string | null; fehler: string | null };
+export type SicherungsStand = { zeit: string | null; fehler: string | null; hinweis: string | null };
 /** Vom Dateibeobachter gemeldet (Ereignis "schule-geaendert") */
 export type Aenderung = { ordner: string | null; datei: string | null };
 

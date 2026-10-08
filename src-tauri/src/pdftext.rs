@@ -5,8 +5,12 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 const SKRIPT: &str = include_str!("pdftext.js");
+/// Ein PDF, das so lange braucht, ist kaputt oder präpariert – abbrechen
+const ZEITLIMIT: Duration = Duration::from_secs(20);
+const MAX_BYTES: u64 = 100 * 1024 * 1024;
 
 /// Text eines PDFs (Seiten mit "--- Seite N ---" getrennt)
 pub fn auslesen(pdf: &Path) -> Result<String, String> {
@@ -19,6 +23,19 @@ pub fn auslesen(pdf: &Path) -> Result<String, String> {
         .spawn()
         .map_err(|e| e.to_string())?;
     kind.stdin.take().ok_or("stdin")?.write_all(SKRIPT.as_bytes()).map_err(|e| e.to_string())?;
+    // Mit Zeitlimit warten – ein hängendes PDF darf den Start nicht dauerhaft blockieren
+    let start = Instant::now();
+    loop {
+        match kind.try_wait().map_err(|e| e.to_string())? {
+            Some(_) => break,
+            None if start.elapsed() > ZEITLIMIT => {
+                let _ = kind.kill();
+                let _ = kind.wait();
+                return Err(format!("PDF-Text: Zeitlimit überschritten ({})", pdf.display()));
+            }
+            None => std::thread::sleep(Duration::from_millis(50)),
+        }
+    }
     let aus = kind.wait_with_output().map_err(|e| e.to_string())?;
     let text = String::from_utf8_lossy(&aus.stdout).into_owned();
     if !aus.status.success() || text.starts_with("FEHLER") {
@@ -27,15 +44,32 @@ pub fn auslesen(pdf: &Path) -> Result<String, String> {
     Ok(text)
 }
 
+/// Merker für PDFs, deren Text nicht lesbar war (sonst würde es bei jedem Start erneut versucht)
+fn ohne_text_merker(pdf: &Path) -> std::path::PathBuf {
+    let name = pdf.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    pdf.with_file_name(format!(".{name}.blockbuch-ohnetext"))
+}
+
 /// Legt <name>.txt neben <name>.pdf an, falls es sie noch nicht gibt
 pub fn txt_erzeugen(pdf: &Path) -> Result<bool, String> {
     let txt = pdf.with_extension("txt");
-    if txt.exists() {
+    if txt.exists() || ohne_text_merker(pdf).exists() {
         return Ok(false);
     }
-    let text = auslesen(pdf)?;
-    crate::notizen::schreibe_atomar(&txt, &text, None)?;
-    Ok(true)
+    if fs::metadata(pdf).map(|m| m.len() > MAX_BYTES).unwrap_or(true) {
+        return Ok(false);
+    }
+    // Hinweis: osascript läuft (anders als die Vorschau-App) ohne Sandbox – darum Zeitlimit und Größengrenze
+    match auslesen(pdf) {
+        Ok(text) => {
+            crate::notizen::schreibe_atomar(&txt, &text, None)?;
+            Ok(true)
+        }
+        Err(e) => {
+            let _ = fs::write(ohne_text_merker(pdf), &e);
+            Err(e)
+        }
+    }
 }
 
 /// Alle PDFs in <Ordner>/assets/ ohne .txt nachträglich auslesen (beim Start)

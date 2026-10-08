@@ -5,7 +5,7 @@ type Props = {
   ordner: string;
   datei: string;
   titel: string;
-  /** Vor dem Wiederherstellen: ungespeicherte Eingaben sichern */
+  /** Ungespeicherte Eingaben in die Datei schreiben (vor dem Sichern/Wiederherstellen) */
   vorWiederherstellen: () => Promise<void>;
   onFehler: (e: unknown) => void;
   onSchliessen: () => void;
@@ -29,11 +29,19 @@ export function Versionen({ ordner, datei, titel, vorWiederherstellen, onFehler,
   const [inhalt, setInhalt] = useState<string>("");
   const [frage, setFrage] = useState(false);
   const listeRef = useRef<HTMLUListElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const [laeuft, setLaeuft] = useState(false);
+  // Fokus nur einmal beim Öffnen in den Dialog (nicht bei jedem Neuzeichnen)
+  useEffect(() => dialogRef.current?.focus(), []);
   const vorherFokus = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
 
   useEffect(() => {
-    api
-      .versionen(ordner, datei)
+    // Erst den jetzigen Stand sichern: Dann ist "aktuell" wirklich der jetzige Stand, und die letzte
+    // Sicherung davor (z. B. vor einer missglückten Änderung durch Claude) lässt sich wiederherstellen
+    vorWiederherstellen()
+      .then(() => api.jetztSichern())
+      .catch(() => {})
+      .then(() => api.versionen(ordner, datei))
       .then((v) => {
         setListe(v);
         // erste Auswahl: die vorletzte Version (die letzte ist meist der aktuelle Stand)
@@ -65,13 +73,15 @@ export function Versionen({ ordner, datei, titel, vorWiederherstellen, onFehler,
   }, [gewaehlt]);
 
   async function wiederherstellen() {
-    if (!gewaehlt) return;
+    if (!gewaehlt || laeuft) return; // kein doppeltes Wiederherstellen per Doppelklick
+    setLaeuft(true);
     try {
       await vorWiederherstellen();
       await api.versionWiederherstellen(ordner, datei, gewaehlt.hash, gewaehlt.pfad);
       onSchliessen();
     } catch (e) {
       onFehler(e);
+      setLaeuft(false);
     }
   }
 
@@ -102,7 +112,7 @@ export function Versionen({ ordner, datei, titel, vorWiederherstellen, onFehler,
         role="dialog"
         aria-label={`Versionen von ${titel}`}
         tabIndex={-1}
-        ref={(el) => el?.focus()}
+        ref={dialogRef}
         onKeyDown={onKeyDown}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -111,7 +121,7 @@ export function Versionen({ ordner, datei, titel, vorWiederherstellen, onFehler,
         </div>
         <div className="versionen__inhalt">
           <ul className="versionen__liste" role="listbox" aria-label="Gesicherte Versionen" ref={listeRef}>
-            {liste === null && <li className="suche__leer">Lade …</li>}
+            {liste === null && <li className="suche__leer">Sichere den jetzigen Stand …</li>}
             {liste?.length === 0 && (
               <li className="suche__leer">Noch keine Sicherung dieser Notiz. Blockbuch sichert alle 5 Minuten und mit ⌘S.</li>
             )}
@@ -146,7 +156,7 @@ export function Versionen({ ordner, datei, titel, vorWiederherstellen, onFehler,
                 erhalten.
               </span>
               <button onClick={() => setFrage(false)}>Abbrechen</button>
-              <button className="primaer" onClick={wiederherstellen} autoFocus>
+              <button className="primaer" onClick={wiederherstellen} disabled={laeuft} autoFocus>
                 Wiederherstellen
               </button>
             </>

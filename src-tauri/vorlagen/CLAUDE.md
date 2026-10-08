@@ -170,8 +170,10 @@ mit ⌘S). Der Nutzer kann jede Version einer Notiz in der App ansehen und wiede
 - Lesen ist erlaubt und nützlich: `git log -- <datei>`, `git show <id>:<pfad>`, `git diff`
   (z. B. „Was habe ich letzte Woche zu Normalformen geschrieben?“ oder eine versehentlich gelöschte
   Stelle wiederfinden).
-- **Nie** selbst committen, pushen, `reset`, `checkout`, `restore`, `rebase`, `stash`, `clean` oder
-  Branches anlegen/löschen – das kann Arbeit des Nutzers vernichten. Sicherungen macht nur die App.
+- **Nur lesende Git-Befehle.** Nie: `add`, `commit` (auch nicht `--amend`), `push`, `reset`, `checkout`,
+  `switch`, `restore`, `rebase`, `stash`, `clean`, `rm`, `mv`, `gc`, `reflog`, `config`, `branch -d` –
+  und kein `git init` in Unterordnern. Das kann Arbeit des Nutzers vernichten oder die automatische
+  Sicherung stören. Sicherungen macht nur die App.
   Wenn etwas wiederhergestellt werden soll: den alten Inhalt mit `git show` lesen und wie jede andere
   Änderung per Edit einfügen.
 

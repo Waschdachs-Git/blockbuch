@@ -380,9 +380,10 @@ function App() {
           sicherung?.fehler
             ? `⚠︎ Sicherung: ${sicherung.fehler}`
             : sicherung?.zeit
-              ? `Gesichert ${zeitAnzeigen(sicherung.zeit)}`
+              ? `Gesichert ${zeitAnzeigen(sicherung.zeit)}${sicherung.hinweis ? " ⓘ" : ""}`
               : null
         }
+        sicherungHinweis={sicherung?.hinweis ?? null}
       />
       <NoteList
         ref={listeRef}
