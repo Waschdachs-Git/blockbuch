@@ -136,6 +136,7 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
       const viewport = seite.getViewport({ scale });
       leinwand.width = viewport.width;
       leinwand.height = viewport.height;
+      leinwand.style.aspectRatio = `${basis.width} / ${basis.height}`;
       await seite.render({ canvas: leinwand, viewport }).promise;
       seite.cleanup();
     } catch (e) {
@@ -145,6 +146,17 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
 
   function seitenAufbauen() {
     if (!pdf) return;
+    const dok = pdf;
+    // Seitenverhältnis von Seite 1 für alle Platzhalter (Querformat-PDFs!), bis jede Seite gezeichnet ist
+    dok
+      .getPage(1)
+      .then((s) => {
+        const v = s.getViewport({ scale: 1 });
+        seiten.querySelectorAll<HTMLCanvasElement>(".pdf__seite:not([data-gezeichnet])").forEach((c) => {
+          c.style.aspectRatio = `${v.width} / ${v.height}`;
+        });
+      })
+      .catch(() => {});
     const anzahl = alleSeiten ? pdf.numPages : 1;
     seitenKnopf.textContent = pdf.numPages > 1 ? (alleSeiten ? "Nur Seite 1" : `Alle ${pdf.numPages} Seiten`) : "1 Seite";
     seitenKnopf.disabled = pdf.numPages <= 1;

@@ -1085,10 +1085,10 @@ button {
   outline-offset: 2px;
 }
 
+/* Bewusst KEIN Flex-Layout: Safari/WebKit staucht Seiten in einem höhenbegrenzten Flex-Bereich
+   zusammen, statt zu scrollen. Das Seitenverhältnis kommt per aspect-ratio aus dem PDF selbst. */
 .pdf__seiten {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: block;
   padding: 8px;
   background: var(--code-bg);
   max-height: 80vh;
@@ -1099,10 +1099,14 @@ button {
   display: block;
   width: 100%;
   height: auto;
-  min-height: 120px;
+  aspect-ratio: 210 / 297; /* A4, bis das echte Format bekannt ist */
   background: #fff;
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.pdf__seite + .pdf__seite {
+  margin-top: 8px;
 }
 
 .pdf__hinweis {
