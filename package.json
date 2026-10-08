@@ -10,7 +10,8 @@
     "tauri": "tauri",
     "test": "vitest run",
     "predev": "node scripts/pdfjs-kopieren.mjs",
-    "prebuild": "node scripts/pdfjs-kopieren.mjs"
+    "prebuild": "node scripts/pdfjs-kopieren.mjs",
+    "app": "./scripts/app-installieren.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
