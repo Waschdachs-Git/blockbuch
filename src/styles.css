@@ -1116,3 +1116,9 @@ button {
   opacity: 0.5;
   cursor: default;
 }
+
+.meldung--status {
+  background: var(--text);
+  color: var(--bg);
+  padding: 8px 14px;
+}

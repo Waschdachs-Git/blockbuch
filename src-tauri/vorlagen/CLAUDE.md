@@ -86,7 +86,7 @@ Was du damit tun kannst:
 - **Arbeitsblätter**: Aufgaben aus dem PDF in die Notiz übernehmen (als Claude-Kasten) oder eine
   Übungsnotiz anlegen. Bilder/PDFs selbst nie löschen oder umbenennen.
 - Eigene Bilder darfst du als Datei in `assets/` ablegen (z. B. SVG-Diagramm) und mit `![…](assets/…)`
-  einbinden.
+  einbinden. Dateinamen ohne Leerzeichen, Klammern und Umlaute (z. B. `er-modell-kunde.svg`).
 
 ## Animierte Grafiken
 

@@ -16,8 +16,15 @@ import type { NodeView } from "@tiptap/pm/view";
 
 /** Ordner der gerade offenen Notiz – setzt EditorPane vor dem Laden */
 let aktuellerOrdner = "";
+let sitzungNr = 0;
+/** Wird bei jedem Laden einer Notiz aufgerufen (auch bei Neuladen nach Änderungen von außen) */
 export function setzeGrafikOrdner(ordner: string) {
   aktuellerOrdner = ordner;
+  sitzungNr++;
+}
+/** Zählt Ladevorgänge – ändert sich die Nummer, ist eine andere Notiz (oder neu geladener Inhalt) offen */
+export function notizSitzung(): number {
+  return sitzungNr;
 }
 export function grafikOrdner(): string {
   return aktuellerOrdner;

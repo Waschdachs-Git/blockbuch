@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "vitest run"
+    "test": "vitest run",
+    "predev": "node scripts/pdfjs-kopieren.mjs",
+    "prebuild": "node scripts/pdfjs-kopieren.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

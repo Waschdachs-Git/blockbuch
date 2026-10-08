@@ -26,24 +26,35 @@ function pdfjs(): Promise<PdfJs> {
 
 async function oeffnen(daten: Uint8Array) {
   const lib = await pdfjs();
-  return lib.getDocument({ data: daten }).promise;
+  return lib.getDocument({
+    data: daten,
+    // Decoder für gescannte PDFs (JBIG2/JPEG 2000), Standardschriften, Zeichensätze – siehe scripts/pdfjs-kopieren.mjs
+    wasmUrl: "/pdfjs/wasm/",
+    standardFontDataUrl: "/pdfjs/standard_fonts/",
+    cMapUrl: "/pdfjs/cmaps/",
+    cMapPacked: true,
+    iccUrl: "/pdfjs/iccs/",
+  }).promise;
 }
 
 /** Gesamter Text eines PDFs (Seiten durch Leerzeilen getrennt) */
 export async function pdfText(daten: Uint8Array): Promise<string> {
   const pdf = await oeffnen(daten);
-  const seiten: string[] = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const inhalt = await (await pdf.getPage(i)).getTextContent();
-    const text = inhalt.items
-      .map((it) => ("str" in it ? it.str + (it.hasEOL ? "\n" : "") : ""))
-      .join("")
-      .replace(/[ \t]+\n/g, "\n")
-      .trim();
-    seiten.push(`--- Seite ${i} ---\n${text}`);
+  try {
+    const seiten: string[] = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const inhalt = await (await pdf.getPage(i)).getTextContent();
+      const text = inhalt.items
+        .map((it) => ("str" in it ? it.str + (it.hasEOL ? "\n" : "") : ""))
+        .join("")
+        .replace(/[ \t]+\n/g, "\n")
+        .trim();
+      seiten.push(`--- Seite ${i} ---\n${text}`);
+    }
+    return seiten.join("\n\n") + "\n";
+  } finally {
+    await pdf.loadingTask.destroy();
   }
-  await pdf.loadingTask.destroy();
-  return seiten.join("\n\n") + "\n";
 }
 
 function knopf(text: string, titel: string, aktion: () => void) {
@@ -65,6 +76,7 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
   let alleSeiten = false;
   let geladenFuer = "";
   let pdf: Awaited<ReturnType<typeof oeffnen>> | null = null;
+  let zerstoert = false;
   const beobachter = new IntersectionObserver((eintraege) => {
     for (const e of eintraege) if (e.isIntersecting) zeichneSeite(e.target as HTMLCanvasElement);
   });
@@ -114,14 +126,21 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
   async function zeichneSeite(leinwand: HTMLCanvasElement) {
     if (!pdf || leinwand.dataset.gezeichnet) return;
     leinwand.dataset.gezeichnet = "1";
-    const seite = await pdf.getPage(Number(leinwand.dataset.seite));
-    const breite = seiten.clientWidth || 640;
-    const basis = seite.getViewport({ scale: 1 });
-    const scale = (breite / basis.width) * (window.devicePixelRatio || 1);
-    const viewport = seite.getViewport({ scale });
-    leinwand.width = viewport.width;
-    leinwand.height = viewport.height;
-    await seite.render({ canvas: leinwand, viewport }).promise;
+    beobachter.unobserve(leinwand);
+    try {
+      const seite = await pdf.getPage(Number(leinwand.dataset.seite));
+      const breite = seiten.clientWidth || 640;
+      const basis = seite.getViewport({ scale: 1 });
+      // höchstens doppelte Auflösung – sonst braucht ein 50-Seiten-PDF Hunderte MB
+      const scale = (breite / basis.width) * Math.min(window.devicePixelRatio || 1, 2);
+      const viewport = seite.getViewport({ scale });
+      leinwand.width = viewport.width;
+      leinwand.height = viewport.height;
+      await seite.render({ canvas: leinwand, viewport }).promise;
+      seite.cleanup();
+    } catch (e) {
+      leinwand.dataset.fehler = fehlerText(e);
+    }
   }
 
   function seitenAufbauen() {
@@ -154,9 +173,15 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
     hinweis("PDF wird geladen …");
     try {
       const daten = await api.assetLesen(ordner, src);
-      if (geladenFuer !== src) return;
+      if (geladenFuer !== src || zerstoert) return;
       await pdf?.loadingTask.destroy();
-      pdf = await oeffnen(daten);
+      const neu = await oeffnen(daten);
+      // Inzwischen geschlossen oder andere Datei? Dann gleich wieder freigeben (jedes PDF hat einen Worker)
+      if (zerstoert || geladenFuer !== src) {
+        await neu.loadingTask.destroy();
+        return;
+      }
+      pdf = neu;
       seitenAufbauen();
     } catch (e) {
       hinweis(`PDF konnte nicht angezeigt werden: ${fehlerText(e)}`);
@@ -188,6 +213,7 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
       return m.type === "attributes" || !code.contains(m.target);
     },
     destroy: () => {
+      zerstoert = true;
       beobachter.disconnect();
       editor.off("selectionUpdate", beiAuswahl);
       pdf?.loadingTask.destroy();

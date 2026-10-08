@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# von scripts/pdfjs-kopieren.mjs erzeugt
+public/pdfjs/

@@ -17,6 +17,7 @@ function App() {
   const [umbenennenDatei, setUmbenennenDatei] = useState<string | null>(null);
   const [notizVersion, setNotizVersion] = useState(0);
   const [meldung, setMeldung] = useState<string | null>(null);
+  const [statusText, setStatusText] = useState<string | null>(null);
 
   const sidebarRef = useRef<HTMLElement>(null);
   const listeRef = useRef<HTMLElement>(null);
@@ -95,8 +96,13 @@ function App() {
   // Fehler aus dem Editor (z. B. Datei konnte nicht eingefügt werden)
   useEffect(() => {
     const f = (e: Event) => melde((e as CustomEvent<string>).detail);
+    const s = (e: Event) => setStatusText((e as CustomEvent<string | null>).detail);
     window.addEventListener("blockbuch:fehler", f);
-    return () => window.removeEventListener("blockbuch:fehler", f);
+    window.addEventListener("blockbuch:status", s);
+    return () => {
+      window.removeEventListener("blockbuch:fehler", f);
+      window.removeEventListener("blockbuch:status", s);
+    };
   }, [melde]);
 
   // ~/Schule öffnen und Lernfeld-Ordner sicherstellen
@@ -332,6 +338,11 @@ function App() {
         onZurueck={fokusListe}
         onFehler={melde}
       />
+      {statusText && !meldung && (
+        <div className="meldung meldung--status" role="status">
+          <span>{statusText}</span>
+        </div>
+      )}
       {meldung && (
         <div className="meldung" role="alert">
           <span>{meldung}</span>

@@ -32,6 +32,7 @@ describe("Rundreise Laden → Speichern", () => {
     "Zeile mit `x > 5 && y` Code",
     "```cpp\nif (a < b && c > d) {}\n```",
     "![Bild](assets/x.png)",
+    "![Bild 1](<assets/Bild (1).png>)",
     "Text  \nmit Umbruch",
     "> [!claude]\n> Erklärung von Claude.\n> Zweite Zeile.",
     "> [!merke] Kurz\n> **Wichtig**",

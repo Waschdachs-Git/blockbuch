@@ -508,11 +508,21 @@ pub fn asset_speichern(root: &Path, ordner: &str, name: &str, inhalt: &[u8]) -> 
     let assets = ordner_pfad(root, ordner)?.join("assets");
     fs::create_dir_all(&assets).map_err(fehler)?;
     let basis = slug(stamm);
+    // iPhone-Fotos (HEIC) als JPEG speichern – das können Claude und andere Programme lesen
+    let (inhalt, endung) = match endung.as_str() {
+        "heic" => (heic_zu_jpeg(inhalt)?, "jpg".to_string()),
+        _ => (inhalt.to_vec(), endung),
+    };
     for n in 1..1000 {
         let datei = if n == 1 { format!("{basis}.{endung}") } else { format!("{basis}-{n}.{endung}") };
-        match fs::OpenOptions::new().write(true).create_new(true).open(assets.join(&datei)) {
+        let pfad = assets.join(&datei);
+        match fs::OpenOptions::new().write(true).create_new(true).open(&pfad) {
             Ok(mut f) => {
-                f.write_all(inhalt).map_err(fehler)?;
+                // Bei Fehler (z. B. Platte voll) keine halbe Datei liegen lassen
+                if let Err(e) = f.write_all(&inhalt).and_then(|_| f.sync_all()) {
+                    let _ = fs::remove_file(&pfad);
+                    return Err(fehler(e));
+                }
                 return Ok(format!("assets/{datei}"));
             }
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -520,6 +530,31 @@ pub fn asset_speichern(root: &Path, ordner: &str, name: &str, inhalt: &[u8]) -> 
         }
     }
     Err("Kein freier Dateiname gefunden.".into())
+}
+
+/// HEIC → JPEG mit dem macOS-Bordwerkzeug `sips`
+fn heic_zu_jpeg(heic: &[u8]) -> Ergebnis<Vec<u8>> {
+    let tmp = std::env::temp_dir().join(format!("blockbuch-{}-{}", std::process::id(), pruefwert(&format!("{:?}", std::time::SystemTime::now()))));
+    fs::create_dir_all(&tmp).map_err(fehler)?;
+    let (ein, aus) = (tmp.join("foto.heic"), tmp.join("foto.jpg"));
+    let ergebnis = (|| {
+        fs::write(&ein, heic).map_err(fehler)?;
+        let ok = std::process::Command::new("sips")
+            .args(["-s", "format", "jpeg"])
+            .arg(&ein)
+            .arg("--out")
+            .arg(&aus)
+            .output()
+            .map_err(fehler)?
+            .status
+            .success();
+        if !ok {
+            return Err("Das iPhone-Foto (HEIC) konnte nicht umgewandelt werden.".to_string());
+        }
+        fs::read(&aus).map_err(fehler)
+    })();
+    let _ = fs::remove_dir_all(&tmp);
+    ergebnis
 }
 
 /// Echter Pfad einer Datei aus <Ordner>/assets/ – nichts außerhalb (auch nicht über Symlinks)
@@ -742,6 +777,38 @@ mod tests {
         assert!(asset_speichern(&root, "../x", "a.png", b"x").is_err());
         assert!(asset_lesen(&root, "LF05-Daten", "../2026.md").is_err());
         assert!(asset_lesen(&root, "LF05-Daten", "assets/../../CLAUDE.md").is_err());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn iphone_foto_heic_wird_jpeg() {
+        let (tmp, root) = testordner();
+        // 1×1-PNG erzeugen und mit sips in HEIC umwandeln (wie ein iPhone-Foto)
+        let png: &[u8] = &[
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0D, 0x49,
+            0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0xF8, 0xCF, 0xC0, 0xF0, 0x1F, 0x00, 0x05, 0x00, 0x01, 0xFF, 0x89, 0x99, 0x3D,
+            0x1D, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+        ];
+        let p = tmp.path().join("a.png");
+        fs::write(&p, png).unwrap();
+        let heic = tmp.path().join("a.heic");
+        let ok = std::process::Command::new("sips")
+            .args(["-s", "format", "heic"])
+            .arg(&p)
+            .arg("--out")
+            .arg(&heic)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !ok {
+            eprintln!("sips kann kein HEIC erzeugen – Test übersprungen");
+            return;
+        }
+        let pfad = asset_speichern(&root, "LF05-Daten", "IMG_1234.HEIC", &fs::read(&heic).unwrap()).unwrap();
+        assert_eq!(pfad, "assets/IMG-1234.jpg");
+        let jpg = asset_lesen(&root, "LF05-Daten", &pfad).unwrap();
+        assert_eq!(&jpg[..2], &[0xFF, 0xD8], "JPEG-Kennung");
     }
 
     #[test]
