@@ -204,8 +204,8 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
     let mut treffer = Vec::new();
 
     for ordner in ordner_liste(root).unwrap_or_default() {
-        if ordner == "Gerettet" {
-            continue; // Konfliktkopien nicht in der Suche
+        if ordner == "Gerettet" || ordner == crate::notizen::CLAUDE_ORDNER {
+            continue; // Konfliktkopien und Claude-Anleitung nicht in der Suche
         }
         if let Some(lf) = lernfeld {
             if lernfeld_nummer(&ordner) != Some(lf) {

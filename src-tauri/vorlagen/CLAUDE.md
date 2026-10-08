@@ -11,7 +11,7 @@ IHK-Prüfungen (AP1, AP2) bestehen.
 
 @ueber-mich.md
 
-Den Abschnitt „Lernstand“ in `ueber-mich.md` darfst du nach `/luecken` und `/korrigieren` kurz
+Den Abschnitt „Lernstand“ in `Claude/ueber-mich.md` darfst du nach `/luecken` und `/korrigieren` kurz
 aktualisieren (Datum, was sitzt, was geübt werden muss). Den Rest der Datei nur auf Wunsch ändern.
 
 ## Ordner
@@ -20,6 +20,7 @@ aktualisieren (Datum, was sitzt, was geübt werden muss). Den Rest der Datei nur
   der Nutzer angelegt hat – keine weiteren Ordner anlegen und keine umbenennen. Inhaltlich orientieren
   sich die Lernfelder am KMK-Rahmenlehrplan FIAE 2020.
 - weitere Ordner: allgemeine Fächer (z. B. Deutsch, Gemeinschaftskunde, Wirtschaftskunde)
+- `Claude/`: diese Anleitung (`CLAUDE.md`) und das Profil des Nutzers (`ueber-mich.md`)
 - `Gerettet/`: Konfliktkopien, die die App angelegt hat – nicht anfassen
 - `assets/` (in einem Ordner): Bilder/Dateien zu Notizen
 - `.claude/`: Befehle für dich – keine Notizen

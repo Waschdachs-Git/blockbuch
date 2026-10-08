@@ -261,11 +261,18 @@ fn umbenennen_ohne_ueberschreiben(ordner: &Path, alt: &str, basis: &str) -> Erge
     Err("Kein freier Dateiname gefunden.".into())
 }
 
-/// Anleitung und Befehle für Claude Code: (Pfad relativ zu ~/Schule, Inhalt, bei neuer App-Version aktualisieren?)
+/// Ordner in ~/Schule für alles, was Claude bei jeder Sitzung liest (Regeln, Profil)
+pub const CLAUDE_ORDNER: &str = "Claude";
+
+/// Verweis an der Stelle, an der Claude Code die Anleitung automatisch lädt (~/Schule/.claude/CLAUDE.md)
+const CLAUDE_CODE_VERWEIS: &str = "# Verweis für Claude Code\n\nDie Regeln für die Notizen stehen in `Claude/CLAUDE.md`:\n\n@../Claude/CLAUDE.md\n";
+
+/// Anleitung und Befehle für Claude: (Pfad relativ zu ~/Schule, Inhalt, bei neuer App-Version aktualisieren?)
 /// `ueber-mich.md` gehört dem Nutzer – wird nur einmal angelegt, nie aktualisiert.
 const VORLAGEN: &[(&str, &str, bool)] = &[
-    ("CLAUDE.md", include_str!("../vorlagen/CLAUDE.md"), true),
-    ("ueber-mich.md", include_str!("../vorlagen/ueber-mich.md"), false),
+    ("Claude/CLAUDE.md", include_str!("../vorlagen/CLAUDE.md"), true),
+    ("Claude/ueber-mich.md", include_str!("../vorlagen/ueber-mich.md"), false),
+    (".claude/CLAUDE.md", CLAUDE_CODE_VERWEIS, true),
     (".claude/commands/aufbereiten.md", include_str!("../vorlagen/commands/aufbereiten.md"), true),
     (".claude/commands/karten.md", include_str!("../vorlagen/commands/karten.md"), true),
     (".claude/commands/luecken.md", include_str!("../vorlagen/commands/luecken.md"), true),
@@ -287,9 +294,43 @@ fn pruefwert(text: &str) -> String {
     format!("{h:016x}")
 }
 
+/// Früher lagen CLAUDE.md und ueber-mich.md direkt in ~/Schule – jetzt im Ordner Claude/.
+/// Nur verschieben, nie überschreiben; das Protokoll zieht mit, damit Updates weiter funktionieren.
+fn alte_orte_umziehen(root: &Path, protokoll: &mut std::collections::BTreeMap<String, String>) -> Ergebnis<()> {
+    for name in ["CLAUDE.md", "ueber-mich.md"] {
+        let alt = root.join(name);
+        let neu_rel = format!("{CLAUDE_ORDNER}/{name}");
+        let neu = root.join(&neu_rel);
+        if !alt.is_file() {
+            continue;
+        }
+        if !neu.exists() {
+            fs::create_dir_all(root.join(CLAUDE_ORDNER)).map_err(fehler)?;
+            fs::rename(&alt, &neu).map_err(fehler)?;
+            if let Some(h) = protokoll.remove(name) {
+                protokoll.insert(neu_rel, h);
+            }
+        } else {
+            // Beide da: die alte nur entfernen, wenn sie unsere unveränderte Vorlage ist
+            let unveraendert = fs::read_to_string(&alt)
+                .ok()
+                .is_some_and(|a| protokoll.get(name).is_some_and(|h| *h == pruefwert(&a)));
+            if unveraendert {
+                fs::remove_file(&alt).map_err(fehler)?;
+                protokoll.remove(name);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Legt fehlende Vorlagen an und aktualisiert sie bei neuen App-Versionen –
 /// aber nur, wenn der Nutzer die Datei seit dem letzten Schreiben nicht selbst geändert hat.
 fn vorlagen_anlegen(root: &Path) -> Ergebnis<()> {
+    // Nie zwei Durchläufe gleichzeitig – sonst überschreiben sie sich gegenseitig das Protokoll
+    // (passiert z. B., wenn die Oberfläche beim Start zweimal schule_oeffnen aufruft)
+    static SPERRE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _sperre = SPERRE.lock().unwrap_or_else(|e| e.into_inner());
     let protokoll_pfad = root.join(VORLAGEN_PROTOKOLL);
     let mut protokoll: std::collections::BTreeMap<String, String> = fs::read_to_string(&protokoll_pfad)
         .unwrap_or_default()
@@ -297,6 +338,8 @@ fn vorlagen_anlegen(root: &Path) -> Ergebnis<()> {
         .filter_map(|z| z.split_once('\t'))
         .map(|(p, h)| (p.to_string(), h.to_string()))
         .collect();
+
+    alte_orte_umziehen(root, &mut protokoll)?;
 
     for (pfad, inhalt, aktualisieren) in VORLAGEN {
         let ziel = root.join(pfad);
@@ -726,16 +769,33 @@ mod tests {
     #[test]
     fn vorlagen_werden_angelegt_aber_nie_ueberschrieben() {
         let (_tmp, root) = testordner();
-        assert!(root.join("CLAUDE.md").exists());
+        assert!(root.join("Claude/CLAUDE.md").exists());
+        assert!(root.join("Claude/ueber-mich.md").exists());
+        assert!(fs::read_to_string(root.join(".claude/CLAUDE.md")).unwrap().contains("@../Claude/CLAUDE.md"));
+        assert!(!root.join("CLAUDE.md").exists(), "nichts mehr direkt in ~/Schule");
         assert!(root.join(".claude/commands/aufbereiten.md").exists());
         // Vorlagen-Ordner tauchen nicht als Notizordner auf
         assert!(!ordner_liste(&root).unwrap().iter().any(|o| o.starts_with('.')));
 
-        fs::write(root.join("CLAUDE.md"), "eigene Version").unwrap();
-        fs::write(root.join("ueber-mich.md"), "mein Profil").unwrap();
+        fs::write(root.join("Claude/CLAUDE.md"), "eigene Version").unwrap();
+        fs::write(root.join("Claude/ueber-mich.md"), "mein Profil").unwrap();
         schule_oeffnen(&root, &[]).unwrap();
-        assert_eq!(fs::read_to_string(root.join("CLAUDE.md")).unwrap(), "eigene Version");
-        assert_eq!(fs::read_to_string(root.join("ueber-mich.md")).unwrap(), "mein Profil");
+        assert_eq!(fs::read_to_string(root.join("Claude/CLAUDE.md")).unwrap(), "eigene Version");
+        assert_eq!(fs::read_to_string(root.join("Claude/ueber-mich.md")).unwrap(), "mein Profil");
+    }
+
+    #[test]
+    fn alte_orte_werden_umgezogen() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("Schule");
+        fs::create_dir_all(&root).unwrap();
+        // Stand einer älteren App-Version: Dateien direkt in ~/Schule, ueber-mich ausgefüllt
+        fs::write(root.join("CLAUDE.md"), include_str!("../vorlagen/CLAUDE.md")).unwrap();
+        fs::write(root.join("ueber-mich.md"), "# Über mich\n\nAusbildungsjahr: 1\n").unwrap();
+        schule_oeffnen(&root, &[]).unwrap();
+        assert!(!root.join("CLAUDE.md").exists() && !root.join("ueber-mich.md").exists());
+        assert!(fs::read_to_string(root.join("Claude/ueber-mich.md")).unwrap().contains("Ausbildungsjahr: 1"), "Profil erhalten");
+        assert!(root.join("Claude/CLAUDE.md").exists());
     }
 
     #[test]

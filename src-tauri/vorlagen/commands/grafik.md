@@ -9,7 +9,7 @@ Baue eine animierte Lern-Grafik zu: $ARGUMENTS
    Ordner (nicht aus `Gerettet/`). Lies sie, damit die Grafik zu den Begriffen und Beispielen passt.
 2. Plane kurz (im Chat, 3–5 Zeilen): Was soll man nach der Grafik verstanden haben? Welche Schritte?
 3. Schreibe die HTML-Datei nach `<Ordner>/assets/<thema-mit-bindestrichen>.html` – streng nach den
-   Regeln im Abschnitt „Animierte Grafiken“ der `CLAUDE.md` (eigenständig, offline ohne CDN,
+   Regeln im Abschnitt „Animierte Grafiken“ der `Claude/CLAUDE.md` (eigenständig, offline ohne CDN,
    hell/dunkel, Abspielen/Pause/Schritt, Erklärtext pro Schritt, ruhiges Tempo, keine Endlosschleifen).
 4. Füge den ```` ```grafik ````-Block mit `src:` und passender `höhe:` in die Notiz ein – nach dem
    Abschnitt, zu dem sie gehört (nie mitten in eine Liste). Mitschrift nicht verändern.

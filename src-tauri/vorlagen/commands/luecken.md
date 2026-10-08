@@ -13,7 +13,7 @@ Finde Lücken zu: $ARGUMENTS
    - **Lücken** – sortiert nach Prüfungsrelevanz, je 1 Satz, warum es wichtig ist
    - **Unsicher** – Stellen in den Notizen, die falsch oder unklar wirken
    - **Vorschlag**: die 3 wichtigsten nächsten Lernschritte
-4. Aktualisiere kurz den Abschnitt „Lernstand“ in `ueber-mich.md` (Datum, Lernfeld, was sitzt,
+4. Aktualisiere kurz den Abschnitt „Lernstand“ in `Claude/ueber-mich.md` (Datum, Lernfeld, was sitzt,
    was fehlt – max. 3 Zeilen).
 5. Frage am Ende, ob du für die wichtigsten Lücken ein Lernskript als neue Notiz anlegen sollst
-   (Format für neue Notizen: siehe `CLAUDE.md`).
+   (Format für neue Notizen: siehe `Claude/CLAUDE.md`).
