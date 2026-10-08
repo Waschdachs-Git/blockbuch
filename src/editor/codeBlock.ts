@@ -6,6 +6,7 @@ import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { common, createLowlight } from "lowlight";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { grafikNodeView } from "./grafikBlock";
+import { pdfNodeView } from "./pdfBlock";
 
 const basis = createLowlight(common);
 /** Ohne bzw. mit unbekannter Sprache nicht raten (falsche Farben, langsam) – einfach als Text */
@@ -72,6 +73,7 @@ export const SichererCodeBlock = CodeBlockLowlight.extend({
     return ({ node, editor, getPos }) => {
       // ```grafik zeigt eine lebendige Grafik statt Code
       if (node.attrs.language === "grafik") return grafikNodeView(node, editor, getPos);
+      if (node.attrs.language === "pdf") return pdfNodeView(node, editor, getPos);
       let aktuell: PMNode = node;
       const dom = document.createElement("div");
       dom.className = "codeblock";
@@ -137,7 +139,7 @@ export const SichererCodeBlock = CodeBlockLowlight.extend({
         contentDOM: code,
         update: (neu) => {
           // Wechsel zu/von "grafik": Darstellung neu aufbauen
-          if (neu.type !== aktuell.type || neu.attrs.language === "grafik") return false;
+          if (neu.type !== aktuell.type || neu.attrs.language === "grafik" || neu.attrs.language === "pdf") return false;
           if (neu.attrs.language !== aktuell.attrs.language) fuelleAuswahl((neu.attrs.language as string) ?? "");
           aktuell = neu;
           return true;

@@ -46,7 +46,7 @@ function emit(event: string, payload: unknown) {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function invoke(cmd: string, a: any): Promise<unknown> {
+async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string, string> }): Promise<unknown> {
   await new Promise((r) => setTimeout(r, 20)); // etwas Verzögerung wie bei echter IPC
   switch (cmd) {
     case "schule_oeffnen":
@@ -101,6 +101,29 @@ async function invoke(cmd: string, a: any): Promise<unknown> {
       return null;
     case "ordner_auflisten":
       return ordner();
+    case "asset_speichern": {
+      // Rohdaten → data:-URL im Speicher (Schlüssel "assets/<name>")
+      const ordnerName = decodeURIComponent(optionen?.headers?.ordner ?? "");
+      const name = decodeURIComponent(optionen?.headers?.name ?? "datei");
+      const [stamm, endung] = [name.replace(/\.[^.]+$/, ""), (name.split(".").pop() ?? "").toLowerCase()];
+      let pfad = `assets/${slug(stamm)}.${endung}`;
+      for (let i = 2; fs[ordnerName][pfad]; i++) pfad = `assets/${slug(stamm)}-${i}.${endung}`;
+      const bytes = a as Uint8Array;
+      let bin = "";
+      bytes.forEach((b) => (bin += String.fromCharCode(b)));
+      const typ = endung === "pdf" ? "application/pdf" : endung === "txt" ? "text/plain" : `image/${endung === "jpg" ? "jpeg" : endung}`;
+      fs[ordnerName][pfad] = `data:${typ};base64,${btoa(bin)}`;
+      return pfad;
+    }
+    case "asset_lesen": {
+      const d = fs[a.ordner]?.[a.pfad];
+      if (!d) throw `Datei nicht gefunden: ${a.pfad}`;
+      const bin = atob(d.split(",")[1]);
+      return Uint8Array.from(bin, (c) => c.charCodeAt(0)).buffer;
+    }
+    case "in_vorschau_oeffnen":
+      console.info("[Simulation] würde in Vorschau öffnen:", a.pfad);
+      return null;
     case "notiz_loeschen":
       delete fs[a.ordner][a.datei];
       return null;
@@ -116,6 +139,7 @@ window.__TAURI_INTERNALS__ = {
   convertFileSrc: (pfad: string) => {
     const [ordner, ...rest] = pfad.split("/");
     const inhalt = fs[ordner]?.[rest.join("/")];
+    if (inhalt?.startsWith("data:")) return inhalt; // Bilder/PDFs
     return inhalt === undefined
       ? "data:text/html,<p style='font:14px sans-serif;color:%23888'>Grafik nicht gefunden</p>"
       : URL.createObjectURL(new Blob([inhalt], { type: "text/html" }));

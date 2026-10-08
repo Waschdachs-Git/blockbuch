@@ -11,7 +11,9 @@ Ergänzungen nur in `> [!claude]`-Kästen.
 
 So gehst du vor:
 
-1. Lies die Notiz(en) komplett. Ändere nur durch gezieltes Einfügen (Edit), nie die ganze Datei neu.
+1. Lies die Notiz(en) komplett – auch eingefügte Bilder (Tafelbilder!) und PDFs (zuerst die `.txt`
+   daneben). Ändere nur durch gezieltes Einfügen (Edit), nie die ganze Datei neu.
+   Tafelbild ohne Erklärung darunter: Inhalt in einem Claude-Kasten unter dem Bild strukturiert abschreiben.
 2. Jedes `❓`: Claude-Kasten mit kurzer, verständlicher Erklärung (mit Beispiel aus der IT-Praxis)
    **nach dem Block**, in dem das `❓` steht (Liste/Tabelle/Code nicht zerreißen), dann `❓` → `✅`.
 3. Jedes `🙋`: Das `🙋` bleibt stehen. Im Kasten eine kurze Einschätzung; eine Formulierung für die

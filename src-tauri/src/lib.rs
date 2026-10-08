@@ -109,6 +109,37 @@ async fn notiz_konfliktkopie(
     notizen::notiz_konfliktkopie(&schule_pfad(&app)?, &ordner, &datei, &inhalt, &uhrzeit)
 }
 
+/// Rohdaten einer Datei (Bild/PDF) speichern – Bytes kommen direkt als Body, Ordner und Name als Header
+#[tauri::command]
+async fn asset_speichern(app: tauri::AppHandle, request: tauri::ipc::Request<'_>) -> Ergebnis<String> {
+    let kopf = |name: &str| -> Ergebnis<String> {
+        let wert = request.headers().get(name).and_then(|w| w.to_str().ok()).ok_or(format!("{name} fehlt"))?;
+        Ok(percent_encoding::percent_decode_str(wert).decode_utf8_lossy().into_owned())
+    };
+    let tauri::ipc::InvokeBody::Raw(inhalt) = request.body() else {
+        return Err("Erwartet Dateiinhalt als Rohdaten.".into());
+    };
+    notizen::asset_speichern(&schule_pfad(&app)?, &kopf("ordner")?, &kopf("name")?, inhalt)
+}
+
+#[tauri::command]
+async fn asset_lesen(app: tauri::AppHandle, ordner: String, pfad: String) -> Ergebnis<tauri::ipc::Response> {
+    Ok(tauri::ipc::Response::new(notizen::asset_lesen(&schule_pfad(&app)?, &ordner, &pfad)?))
+}
+
+/// PDF/Bild in der Mac-App „Vorschau“ öffnen (zum Markieren, Unterschreiben, Drucken)
+#[tauri::command]
+async fn in_vorschau_oeffnen(app: tauri::AppHandle, ordner: String, pfad: String) -> Ergebnis<()> {
+    let datei = notizen::asset_pfad(&schule_pfad(&app)?, &ordner, &pfad)?;
+    std::process::Command::new("open")
+        .arg("-a")
+        .arg("Preview")
+        .arg(datei)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 /// Von der Oberfläche aufgerufen, nachdem alles gesichert ist
 #[tauri::command]
 fn beenden(app: tauri::AppHandle) {
@@ -161,6 +192,9 @@ pub fn run() {
             notiz_lesen,
             notiz_speichern,
             notiz_konfliktkopie,
+            asset_speichern,
+            asset_lesen,
+            in_vorschau_oeffnen,
             beenden,
             notiz_erstellen,
             notiz_umbenennen,

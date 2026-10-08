@@ -19,6 +19,9 @@ let aktuellerOrdner = "";
 export function setzeGrafikOrdner(ordner: string) {
   aktuellerOrdner = ordner;
 }
+export function grafikOrdner(): string {
+  return aktuellerOrdner;
+}
 
 /** Ereignis, wenn sich Dateien in assets/ ändern (z. B. Claude hat die Grafik überarbeitet) */
 export const ASSETS_GEAENDERT = "blockbuch:assets-geaendert";

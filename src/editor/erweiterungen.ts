@@ -5,9 +5,9 @@ import { TaskItem, TaskList } from "@tiptap/extension-list";
 import { TableKit } from "@tiptap/extension-table";
 import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
-import Image from "@tiptap/extension-image";
 import { SichererCodeBlock } from "./codeBlock";
 import { Kaesten } from "./kaesten";
+import { BildMitAssets, Dateiablage } from "./dateiablage";
 
 export function editorErweiterungen(): Extensions {
   return [
@@ -17,7 +17,8 @@ export function editorErweiterungen(): Extensions {
     TaskList,
     TaskItem.configure({ nested: true }),
     TableKit.configure({ table: { resizable: false } }),
-    Image,
+    BildMitAssets,
+    Dateiablage,
     Placeholder.configure({
       placeholder: ({ node }) => (node.type.name === "heading" ? "Überschrift" : "Schreib los … oder tippe / für Blöcke"),
     }),

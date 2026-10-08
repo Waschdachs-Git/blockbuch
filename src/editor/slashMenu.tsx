@@ -3,6 +3,7 @@ import { Extension, type Editor, type Range } from "@tiptap/core";
 import Suggestion, { exitSuggestion, type SuggestionProps, type SuggestionKeyDownProps } from "@tiptap/suggestion";
 import { useEffect, useRef } from "react";
 import { MARKER_FRAGEN, MARKER_UNKLAR } from "./kaesten";
+import { dateiAuswaehlen } from "./dateiablage";
 
 export type SlashEintrag = {
   titel: string;
@@ -31,6 +32,11 @@ export const SLASH_EINTRAEGE: SlashEintrag[] = [
     aktion: (e, r) => e.chain().focus().deleteRange(r).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
   { titel: "Code", hinweis: "```", stichworte: ["code", "programm", "java", "sql", "python", "csharp"], icon: "</>",
     aktion: (e, r) => e.chain().focus().deleteRange(r).setCodeBlock().run() },
+  { titel: "Bild oder PDF", hinweis: "Datei wählen", stichworte: ["bild", "foto", "pdf", "datei", "arbeitsblatt"], icon: "🖼",
+    aktion: (e, r) => {
+      e.chain().focus().deleteRange(r).run();
+      dateiAuswaehlen(e);
+    } },
   { titel: "Animierte Grafik", hinweis: "```grafik", stichworte: ["grafik", "animation", "bild", "diagramm"], icon: "✦",
     aktion: (e, r) =>
       e.chain().focus().deleteRange(r).insertContent({

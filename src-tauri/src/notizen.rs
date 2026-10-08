@@ -490,6 +490,55 @@ pub fn notiz_umbenennen(root: &Path, ordner: &str, datei: &str, titel: &str) -> 
     lies_info(&ordner_p.join(neu_name))
 }
 
+/// Dateitypen, die in assets/ abgelegt werden dürfen (Bilder, PDFs, extrahierter PDF-Text)
+const ASSET_ENDUNGEN: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "heic", "pdf", "txt"];
+const ASSET_MAX_BYTES: usize = 100 * 1024 * 1024;
+
+/// Speichert eine eingefügte/abgelegte Datei in <Ordner>/assets/ unter einem freien, lesbaren Namen.
+/// Gibt den Pfad relativ zur Notiz zurück, z. B. "assets/Arbeitsblatt-Joins.pdf".
+pub fn asset_speichern(root: &Path, ordner: &str, name: &str, inhalt: &[u8]) -> Ergebnis<String> {
+    if inhalt.len() > ASSET_MAX_BYTES {
+        return Err("Die Datei ist zu groß (höchstens 100 MB).".into());
+    }
+    let (stamm, endung) = name.rsplit_once('.').unwrap_or((name, ""));
+    let endung = endung.to_ascii_lowercase();
+    if !ASSET_ENDUNGEN.contains(&endung.as_str()) {
+        return Err(format!("Dateityp „.{endung}“ wird nicht unterstützt (Bilder, PDF)."));
+    }
+    let assets = ordner_pfad(root, ordner)?.join("assets");
+    fs::create_dir_all(&assets).map_err(fehler)?;
+    let basis = slug(stamm);
+    for n in 1..1000 {
+        let datei = if n == 1 { format!("{basis}.{endung}") } else { format!("{basis}-{n}.{endung}") };
+        match fs::OpenOptions::new().write(true).create_new(true).open(assets.join(&datei)) {
+            Ok(mut f) => {
+                f.write_all(inhalt).map_err(fehler)?;
+                return Ok(format!("assets/{datei}"));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(fehler(e)),
+        }
+    }
+    Err("Kein freier Dateiname gefunden.".into())
+}
+
+/// Echter Pfad einer Datei aus <Ordner>/assets/ – nichts außerhalb (auch nicht über Symlinks)
+pub fn asset_pfad(root: &Path, ordner: &str, pfad: &str) -> Ergebnis<PathBuf> {
+    let datei = pfad.strip_prefix("assets/").ok_or("Nur Dateien aus assets/ sind erlaubt.")?;
+    pruefe_name(datei)?;
+    let assets = ordner_pfad(root, ordner)?.join("assets");
+    let echt = assets.join(datei).canonicalize().map_err(|_| format!("Datei nicht gefunden: {pfad}"))?;
+    if !echt.starts_with(assets.canonicalize().map_err(fehler)?) {
+        return Err("Zugriff verweigert.".into());
+    }
+    Ok(echt)
+}
+
+/// Liest eine Datei aus <Ordner>/assets/ (z. B. ein PDF zum Anzeigen)
+pub fn asset_lesen(root: &Path, ordner: &str, pfad: &str) -> Ergebnis<Vec<u8>> {
+    fs::read(asset_pfad(root, ordner, pfad)?).map_err(fehler)
+}
+
 pub fn notiz_loeschen(root: &Path, ordner: &str, datei: &str) -> Ergebnis<()> {
     let pfad = notiz_pfad(root, ordner, datei)?;
     // In den Papierkorb, nicht endgültig – lässt sich im Finder wiederherstellen
@@ -676,6 +725,23 @@ mod tests {
 
         schule_oeffnen(&root, &[]).unwrap();
         assert!(fs::read_to_string(&befehl).unwrap().contains("Karteikarten"));
+    }
+
+    #[test]
+    fn assets_speichern_und_lesen() {
+        let (_tmp, root) = testordner();
+        let p = asset_speichern(&root, "LF05-Daten", "Arbeitsblatt Joins.PDF", b"%PDF-1.4").unwrap();
+        assert_eq!(p, "assets/Arbeitsblatt-Joins.pdf");
+        let p2 = asset_speichern(&root, "LF05-Daten", "Arbeitsblatt Joins.pdf", b"%PDF-2").unwrap();
+        assert_eq!(p2, "assets/Arbeitsblatt-Joins-2.pdf");
+        assert_eq!(asset_lesen(&root, "LF05-Daten", &p).unwrap(), b"%PDF-1.4");
+        // Tafelbild mit Umlauten
+        assert_eq!(asset_speichern(&root, "LF05-Daten", "Tafel Übung.jpeg", b"x").unwrap(), "assets/Tafel-Uebung.jpeg");
+        // Nicht erlaubt
+        assert!(asset_speichern(&root, "LF05-Daten", "virus.exe", b"x").is_err());
+        assert!(asset_speichern(&root, "../x", "a.png", b"x").is_err());
+        assert!(asset_lesen(&root, "LF05-Daten", "../2026.md").is_err());
+        assert!(asset_lesen(&root, "LF05-Daten", "assets/../../CLAUDE.md").is_err());
     }
 
     #[test]

@@ -92,6 +92,13 @@ function App() {
     };
   }, []);
 
+  // Fehler aus dem Editor (z. B. Datei konnte nicht eingefügt werden)
+  useEffect(() => {
+    const f = (e: Event) => melde((e as CustomEvent<string>).detail);
+    window.addEventListener("blockbuch:fehler", f);
+    return () => window.removeEventListener("blockbuch:fehler", f);
+  }, [melde]);
+
   // ~/Schule öffnen und Lernfeld-Ordner sicherstellen
   useEffect(() => {
     api

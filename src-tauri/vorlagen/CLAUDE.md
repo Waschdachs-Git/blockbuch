@@ -61,6 +61,33 @@ Ergänzungen schreibst du **nur in Claude-Kästen**:
   Code nur als `Inline`). Neue Karten **an den vorhandenen** Karten-Kasten anhängen. Der Karten-Kasten
   steht immer **am Ende** der Notiz (nach „Kurz zusammengefasst“).
 
+## Bilder und PDFs
+
+Der Nutzer legt Fotos (Tafelbilder, Arbeitsblätter vom iPhone), Screenshots und PDFs per Drag & Drop
+oder ⌘V in Notizen ab. Die App speichert sie in `<Ordner>/assets/` und fügt ein:
+
+- Bild: `![Bild-2026-10-08-0759](assets/Bild-2026-10-08-0759.png)`
+- PDF:
+
+  ````markdown
+  ```pdf
+  src: assets/Arbeitsblatt-Joins.pdf
+  ```
+  ````
+
+  Neben jedem PDF liegt eine `.txt` mit dem herausgelesenen Text (`assets/Arbeitsblatt-Joins.txt`).
+  Für einen schnellen Überblick zuerst die `.txt` lesen; für Layout, Tabellen oder gescannte
+  Arbeitsblätter das PDF selbst.
+
+Was du damit tun kannst:
+
+- **Tafelbilder/Fotos auswerten**: Bild lesen und den Inhalt als Claude-Kasten unter dem Bild
+  abschreiben/strukturieren (Tabellen, Diagramme als Text beschreiben).
+- **Arbeitsblätter**: Aufgaben aus dem PDF in die Notiz übernehmen (als Claude-Kasten) oder eine
+  Übungsnotiz anlegen. Bilder/PDFs selbst nie löschen oder umbenennen.
+- Eigene Bilder darfst du als Datei in `assets/` ablegen (z. B. SVG-Diagramm) und mit `![…](assets/…)`
+  einbinden.
+
 ## Animierte Grafiken
 
 Die App kann **lebendige Grafiken** direkt in einer Notiz zeigen – das ist eine Stärke von dir:
@@ -129,7 +156,8 @@ Text …
 
 Überschriften (`#`), Absätze, **fett**, *kursiv*, ~~durchgestrichen~~, `Code`, Links, Listen,
 nummerierte Listen, Checklisten (`- [ ]`), Tabellen, Codeblöcke mit Sprache (```` ```sql ````),
-Zitate/Kästen, Trennlinien, Bilder (`![Beschreibung](assets/datei.png)`), Grafik-Blöcke (```` ```grafik ````).
+Zitate/Kästen, Trennlinien, Bilder (`![Beschreibung](assets/datei.png)`), Grafik-Blöcke (```` ```grafik ````),
+PDF-Blöcke (```` ```pdf ````).
 
 **Nicht verwenden:** HTML (`<details>`, `<br>` …), Fußnoten, Unterstreichen, `===`-Überschriften.
 Notizen mit HTML öffnet die App nur schreibgeschützt.

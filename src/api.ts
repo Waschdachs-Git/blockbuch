@@ -18,6 +18,14 @@ export const api = {
     invoke<number>("notiz_speichern", { ordner, datei, inhalt, erwartet }),
   notizKonfliktkopie: (ordner: string, datei: string, inhalt: string, uhrzeit: string) =>
     invoke<string>("notiz_konfliktkopie", { ordner, datei, inhalt, uhrzeit }),
+  /** Datei (Bild/PDF) in <Ordner>/assets/ speichern – gibt "assets/<name>" zurück */
+  assetSpeichern: (ordner: string, name: string, daten: Uint8Array) =>
+    invoke<string>("asset_speichern", daten, {
+      headers: { ordner: encodeURIComponent(ordner), name: encodeURIComponent(name) },
+    }),
+  assetLesen: async (ordner: string, pfad: string) =>
+    new Uint8Array(await invoke<ArrayBuffer>("asset_lesen", { ordner, pfad })),
+  inVorschauOeffnen: (ordner: string, pfad: string) => invoke<void>("in_vorschau_oeffnen", { ordner, pfad }),
   /** Beendet die App – erst aufrufen, wenn alles gesichert ist */
   beenden: () => invoke<void>("beenden"),
   notizErstellen: (ordner: string, lernfeld: string | null, titel: string, datum: string) =>

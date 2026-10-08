@@ -1068,3 +1068,51 @@ button {
   border: 1px solid var(--linie);
   background: var(--bg);
 }
+
+/* ---------- Schritt 7: Bilder und PDFs ---------- */
+
+.inhalt img.bild {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin: 0.8em 0;
+  border-radius: 8px;
+  border: 1px solid var(--linie);
+}
+
+.inhalt img.bild.ProseMirror-selectednode {
+  outline: 2px solid var(--akzent);
+  outline-offset: 2px;
+}
+
+.pdf__seiten {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: var(--code-bg);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.pdf__seite {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 120px;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.pdf__hinweis {
+  margin: 24px;
+  text-align: center;
+  color: var(--text-leise);
+  font-size: 13px;
+}
+
+.grafik__knopf:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
