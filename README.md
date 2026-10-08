@@ -114,3 +114,8 @@ npm install
 
 Es darf immer nur eine Blockbuch-Instanz laufen (Entwicklung oder App), weil beide `~/Schule`
 verwenden.
+
+## Lizenz
+
+[MIT](LICENSE) – du darfst den Code frei verwenden, ändern und weitergeben, solange der
+Lizenzhinweis erhalten bleibt.
