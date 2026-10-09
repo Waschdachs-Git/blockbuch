@@ -7,12 +7,17 @@ import { Placeholder } from "@tiptap/extensions";
 import { Markdown } from "@tiptap/markdown";
 import { SichererCodeBlock } from "./codeBlock";
 import { Kaesten } from "./kaesten";
+import { KeineGeerbteFormatierung, SicheresFett, SicheresKursiv } from "./formatierung";
 import { BildMitAssets, Dateiablage } from "./dateiablage";
 
 export function editorErweiterungen(): Extensions {
   return [
     // Unterstreichen aus: Markdown kennt es nicht, und "++" würde "C++ und i++" zerstören
-    StarterKit.configure({ underline: false, codeBlock: false, link: { openOnClick: false, autolink: true } }),
+    StarterKit.configure({ underline: false, codeBlock: false, bold: false, italic: false, link: { openOnClick: false, autolink: true } }),
+    // eigene Fett/Kursiv-Regeln: "3 * 4 * 5" bleibt normaler Text (siehe formatierung.ts)
+    SicheresFett,
+    SicheresKursiv,
+    KeineGeerbteFormatierung,
     SichererCodeBlock,
     TaskList,
     TaskItem.configure({ nested: true }),
