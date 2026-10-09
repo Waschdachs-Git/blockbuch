@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "reac
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { MARKER_FRAGEN, MARKER_UNKLAR, zaehleMarker } from "../editor/kaesten";
 import { setzeGrafikOrdner } from "../editor/grafikBlock";
+import { wortschatzLaden, wortvorschlagSchluessel } from "../editor/wortvorschlag";
 import { fundstellen } from "../editor/falten";
 import { api, fehlerText, istKonflikt } from "../api";
 import { aufraeumen, setzeZusammen, wuerdeInhaltVerlieren, zerlege, type NotizDatei } from "../editor/datei";
@@ -77,8 +78,8 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
     editorProps: {
       attributes: { class: "inhalt", spellcheck: "true", lang: "de", "aria-label": "Notiz-Text" },
       handleKeyDown: (_view, event) => {
-        // Esc ohne offenes /-Menü: zurück in die Notizliste
-        if (event.key === "Escape" && !slashRef.current.offen) {
+        // Esc ohne offenes /-Menü und ohne Wortvorschlag: zurück in die Notizliste
+        if (event.key === "Escape" && !slashRef.current.offen && !wortvorschlagSchluessel.getState(_view.state)) {
           speichern();
           cb.current.onZurueck();
           return true;
@@ -205,6 +206,7 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
 
   async function laden(o: string, d: string) {
     const nr = ++ladeNr.current;
+    wortschatzLaden();
     editor?.setEditable(false, false); // während des Ladens nichts tippen, was verloren ginge
     const { inhalt, geaendert: zeit } = await api.notizLesen(o, d);
     // Inzwischen eine andere Notiz gewählt? Dann diese Antwort verwerfen

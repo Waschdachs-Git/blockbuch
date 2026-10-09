@@ -140,6 +140,18 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
     case "in_vorschau_oeffnen":
       console.info("[Simulation] würde in Vorschau öffnen:", a.pfad);
       return null;
+    case "wortschatz": {
+      const anzahl = new Map<string, number>();
+      for (const dateien of Object.values(fs)) {
+        for (const [d, inhalt] of Object.entries(dateien)) {
+          if (!d.endsWith(".md")) continue;
+          for (const [w] of inhalt.matchAll(/\p{L}[\p{L}\p{N}]*(?:-[\p{L}\p{N}]+)*/gu)) {
+            if ([...w].length >= 3) anzahl.set(w, (anzahl.get(w) ?? 0) + 1);
+          }
+        }
+      }
+      return [...anzahl].map(([wort, gewicht]) => ({ wort, gewicht })).sort((a, b) => b.gewicht - a.gewicht);
+    }
     case "suchen": {
       // einfache Nachbildung der Rust-Suche (ohne Umlaut-Faltung)
       const woerter = falten(String(a.anfrage)).split(/\s+/).filter((w) => w && !/^lf\d+$/.test(w) && !w.startsWith("#"));

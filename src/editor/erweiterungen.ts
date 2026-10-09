@@ -8,6 +8,7 @@ import { Markdown } from "@tiptap/markdown";
 import { SichererCodeBlock } from "./codeBlock";
 import { Kaesten } from "./kaesten";
 import { KeineGeerbteFormatierung, SicheresFett, SicheresKursiv } from "./formatierung";
+import { Wortvorschlag } from "./wortvorschlag";
 import { BildMitAssets, Dateiablage } from "./dateiablage";
 
 export function editorErweiterungen(): Extensions {
@@ -29,5 +30,6 @@ export function editorErweiterungen(): Extensions {
     }),
     Markdown.configure({ indentation: { style: "space", size: 2 } }),
     Kaesten,
+    Wortvorschlag,
   ];
 }

@@ -1374,3 +1374,27 @@ button {
   opacity: 0.45;
   cursor: default;
 }
+
+/* ---------- Wortvorschlag beim Tippen (Tab übernimmt) ---------- */
+
+.wortvorschlag {
+  color: var(--text-leise);
+  opacity: 0.75;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: pre-wrap;
+}
+
+.wortvorschlag__taste {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--linie);
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 15px;
+  vertical-align: 2px;
+  font-style: normal;
+  font-weight: 500;
+}

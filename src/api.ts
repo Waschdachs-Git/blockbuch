@@ -30,6 +30,8 @@ export const api = {
   jetztSichern: () => invoke<string | null>("jetzt_sichern"),
   /** Volltextsuche; leere Anfrage = zuletzt bearbeitete Notizen */
   suchen: (anfrage: string) => invoke<Treffer[]>("suchen", { anfrage }),
+  /** Wörter aus Notizen und PDFs mit Gewicht – für die Wortvorschläge beim Tippen */
+  wortschatz: () => invoke<{ wort: string; gewicht: number }[]>("wortschatz"),
   notizenAuflisten: (ordner: string) => invoke<NotizInfo[]>("notizen_auflisten", { ordner }),
   notizLesen: (ordner: string, datei: string) => invoke<NotizInhalt>("notiz_lesen", { ordner, datei }),
   /** erwartet = Änderungszeit vom letzten Lesen/Speichern; null überschreibt bewusst */

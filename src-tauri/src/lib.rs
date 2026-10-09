@@ -7,6 +7,7 @@ mod notizen;
 mod pdftext;
 mod sicherung;
 mod suche;
+mod wortschatz;
 
 use notizen::{Ergebnis, NotizInfo, NotizInhalt};
 use serde::Serialize;
@@ -153,6 +154,12 @@ async fn in_vorschau_oeffnen(app: tauri::AppHandle, ordner: String, pfad: String
         .spawn()
         .map(|_| ())
         .map_err(|e| e.to_string())
+}
+
+/// Wörter aus Notizen und PDFs für die Wortvorschläge beim Tippen
+#[tauri::command]
+async fn wortschatz(app: tauri::AppHandle) -> Ergebnis<Vec<wortschatz::Wort>> {
+    Ok(wortschatz::sammeln(&schule_pfad(&app)?))
 }
 
 /// Volltextsuche (leere Anfrage: zuletzt bearbeitete Notizen)
@@ -316,6 +323,7 @@ pub fn run() {
             asset_lesen,
             in_vorschau_oeffnen,
             suchen,
+            wortschatz,
             versionen,
             version_lesen,
             version_wiederherstellen,
