@@ -1398,3 +1398,8 @@ button {
   font-style: normal;
   font-weight: 500;
 }
+
+/* Suche: Hinweis, wenn eine ähnliche Schreibweise gefunden wurde */
+.suche__aehnlich {
+  color: var(--akzent);
+}

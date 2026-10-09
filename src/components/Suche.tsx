@@ -35,6 +35,9 @@ export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
   const [fehler, setFehler] = useState<string | null>(null);
   const listeRef = useRef<HTMLUListElement>(null);
   const woerter = suchwoerter(anfrage);
+  /** Im Treffer wirklich gefundene Wörter – bei ähnlicher Schreibweise das gefundene, nicht das getippte */
+  const gefunden = (t: Treffer) => (t.woerter.length ? t.woerter : woerter);
+  const aehnlich = [...new Set(treffer.flatMap((t) => t.aehnlich))];
   const [laedt, setLaedt] = useState(false);
   // Fokus beim Schließen dorthin zurück, wo er vorher war (z. B. Cursor im Editor)
   const vorherFokus = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
@@ -89,7 +92,7 @@ export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
       setAuswahl((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter" && treffer[auswahl] && !laedt) {
       e.preventDefault();
-      onOeffnen(treffer[auswahl], woerter);
+      onOeffnen(treffer[auswahl], gefunden(treffer[auswahl]));
     }
   }
 
@@ -112,6 +115,9 @@ export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
         />
         <div className="suche__kopf" aria-live="polite">
           {woerter.length ? `${treffer.length} Treffer` : "Zuletzt bearbeitet"}
+          {aehnlich.length > 0 && (
+            <span className="suche__aehnlich"> · ähnliche Schreibweise: {aehnlich.slice(0, 3).join(", ")}</span>
+          )}
         </div>
         {fehler && <p className="suche__leer">Fehler: {fehler}</p>}
         {!fehler && anfrage.trim() && treffer.length === 0 && <p className="suche__leer">Nichts gefunden.</p>}
@@ -124,19 +130,19 @@ export function Suche({ ordnerName, onOeffnen, onSchliessen }: Props) {
               aria-selected={i === auswahl}
               className={`suche__treffer ${i === auswahl ? "ist-aktiv" : ""}`}
               onMouseEnter={() => setAuswahl(i)}
-              onClick={() => onOeffnen(t, woerter)}
+              onClick={() => onOeffnen(t, gefunden(t))}
             >
               <div className="suche__zeile">
                 <span className="suche__titel">
                   {t.art === "pdf" ? "📄 " : ""}
-                  {hervorheben(t.titel, woerter)}
+                  {hervorheben(t.titel, gefunden(t))}
                 </span>
                 <span className="suche__ort">
                   {ordnerName(t.ordner)}
                   {t.datum ? ` · ${datumAnzeigen(t.datum)}` : ""}
                 </span>
               </div>
-              {t.ausschnitt && <div className="suche__ausschnitt">{hervorheben(t.ausschnitt, woerter)}</div>}
+              {t.ausschnitt && <div className="suche__ausschnitt">{hervorheben(t.ausschnitt, gefunden(t))}</div>}
             </li>
           ))}
         </ul>

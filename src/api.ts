@@ -12,6 +12,10 @@ export type Treffer = {
   ausschnitt: string;
   art: "notiz" | "pdf";
   pdf: string | null;
+  /** im Treffer gefundene Wörter (gefaltet) – bei Tippfehlern das ähnlich geschriebene Wort */
+  woerter: string[];
+  /** gefundene ähnliche Schreibweisen, z. B. "Primärschlüssel" */
+  aehnlich: string[];
 };
 export type Version = { hash: string; zeit: string; nachricht: string; pfad: string };
 /** Ereignis "sicherung": Zeitpunkt der letzten Sicherung oder Fehler */

@@ -1,9 +1,13 @@
 // Volltextsuche über alle Notizen in ~/Schule und den Text der PDFs (assets/*.txt).
 // Durchsucht bei jeder Anfrage direkt die Dateien – so ist auch frisch von Claude Geschriebenes dabei.
 // Bei einigen hundert Notizen dauert das nur Millisekunden; ein Index wäre erst bei sehr vielen Dateien nötig.
+//
+// Fehlertolerant (Hilfe bei LRS): Kommt ein Suchwort ab 5 Buchstaben nirgends vor, sucht die Suche
+// stattdessen nach ähnlich geschriebenen Wörtern ("Primerschlüsel" → "Primärschlüssel").
 
 use crate::notizen::{lies_info, ordner_liste};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -20,6 +24,11 @@ pub struct Treffer {
     pub art: &'static str,
     /// Bei PDF-Treffern: Pfad des PDFs (assets/…)
     pub pdf: Option<String>,
+    /// Wörter, die in diesem Treffer wirklich gefunden wurden (gefaltet) – zum Hervorheben und Hinspringen.
+    /// Bei ähnlicher Schreibweise steht hier das gefundene Wort, nicht das getippte.
+    pub woerter: Vec<String>,
+    /// Gefundene ähnliche Schreibweisen, wie sie im Text stehen (z. B. "Primärschlüssel")
+    pub aehnlich: Vec<String>,
     #[serde(skip)]
     punkte: u32,
     #[serde(skip)]
@@ -117,26 +126,150 @@ fn ausschnitt(text: &str, woerter: &[String]) -> String {
     s
 }
 
-/// Bewertung: alle Wörter müssen vorkommen; Titel zählt viel, Überschriften mehr als Text
-fn bewerten(titel: &str, text: &str, woerter: &[String]) -> Option<u32> {
+/// Kommt ein Suchwort in weniger Dokumenten vor, werden auch ähnliche Schreibweisen gesucht
+const SELTEN: usize = 3;
+
+/// Ein Suchwort: das getippte Wort, ggf. ergänzt um ähnlich geschriebene Wörter
+#[derive(Debug, Clone)]
+struct Suchwort {
+    /// gefaltete Formen, von denen eine vorkommen muss – zuerst das getippte Wort, dann die ähnlichsten
+    varianten: Vec<String>,
+    /// Schreibweise im Text je Variante; None = das getippte Wort selbst
+    originale: Vec<Option<String>>,
+}
+
+/// Bewertung: alle Wörter müssen vorkommen; Titel zählt viel, Überschriften mehr als Text.
+/// Pro Suchwort zählt nur die erste gefundene Variante; eine ähnliche Schreibweise zählt halb so viel.
+/// Liefert auch die gefundenen Varianten (zum Hervorheben) und die ähnlichen Schreibweisen.
+fn bewerten(titel: &str, text: &str, woerter: &[Suchwort]) -> Option<(u32, Vec<String>, Vec<String>)> {
     let (t, x) = (falten(titel), falten(text));
     let ueberschriften: Vec<String> = text.lines().filter(|z| z.trim_start().starts_with('#')).map(falten).collect();
     let mut punkte = 0;
+    let mut gefunden = Vec::new();
+    let mut aehnlich = Vec::new();
     for w in woerter {
-        let im_titel = t.contains(w.as_str());
-        let im_text = x.matches(w.as_str()).count() as u32;
-        if !im_titel && im_text == 0 {
-            return None;
-        }
+        let treffer = w.varianten.iter().zip(&w.originale).find_map(|(v, original)| {
+            let im_titel = t.contains(v.as_str());
+            let im_text = x.matches(v.as_str()).count() as u32;
+            (im_titel || im_text > 0).then_some((v, original, im_titel, im_text))
+        });
+        let (v, original, im_titel, im_text) = treffer?;
+        let mut wort_punkte = im_text.min(10);
         if im_titel {
-            punkte += 20;
+            wort_punkte += 20;
         }
-        punkte += im_text.min(10);
-        if ueberschriften.iter().any(|z| z.contains(w.as_str())) {
-            punkte += 8;
+        if ueberschriften.iter().any(|z| z.contains(v.as_str())) {
+            wort_punkte += 8;
+        }
+        gefunden.push(v.clone());
+        // genau doppelt, ähnlich einfach – so steht ein genauer Treffer immer vor einem gleich guten ähnlichen
+        match original {
+            Some(o) => {
+                aehnlich.push(o.clone());
+                punkte += wort_punkte;
+            }
+            None => punkte += 2 * wort_punkte,
         }
     }
-    Some(punkte)
+    Some((punkte, gefunden, aehnlich))
+}
+
+/// Vergleichsform für Tippfehler: Umlaute ohne e ("Primär" → "primar") – wer "u" statt "ü" tippt,
+/// liegt so nur einen statt zwei Buchstaben daneben
+fn einfach(text: &str) -> String {
+    text.to_lowercase().replace('ä', "a").replace('ö', "o").replace('ü', "u").replace('ß', "ss")
+}
+
+/// Tippfehler-Abstand (Einfügen, Löschen, Ersetzen, zwei Buchstaben vertauscht)
+fn abstand(a: &[char], b: &[char]) -> usize {
+    let mut d = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+    for (i, zeile) in d.iter_mut().enumerate() {
+        zeile[0] = i;
+    }
+    for j in 0..=b.len() {
+        d[0][j] = j;
+    }
+    for i in 1..=a.len() {
+        for j in 1..=b.len() {
+            let kosten = usize::from(a[i - 1] != b[j - 1]);
+            d[i][j] = (d[i - 1][j] + 1).min(d[i][j - 1] + 1).min(d[i - 1][j - 1] + kosten);
+            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                d[i][j] = d[i][j].min(d[i - 2][j - 2] + 1);
+            }
+        }
+    }
+    d[a.len()][b.len()]
+}
+
+/// Kleinster Abstand von `wort` zum Anfang von `kandidat` (so wie die normale Suche auch
+/// Wortanfänge findet: "normalform" findet "Normalformen")
+fn abstand_zum_anfang(wort: &[char], kandidat: &[char], erlaubt: usize) -> usize {
+    if kandidat.len() + erlaubt < wort.len() {
+        return usize::MAX;
+    }
+    (wort.len().saturating_sub(erlaubt)..=wort.len() + erlaubt)
+        .filter(|&l| l <= kandidat.len() && l > 0)
+        .map(|l| abstand(wort, &kandidat[..l]))
+        .min()
+        .unwrap_or(usize::MAX)
+}
+
+/// Ein Wort aus den Notizen: gefaltet ("primaerschluessel"), einfach ("primarschlussel"),
+/// Schreibweise für den Hinweis und Anzahl
+struct Vokabel {
+    gefaltet: Vec<char>,
+    einfach: Vec<char>,
+    original: String,
+    anzahl: u32,
+}
+
+/// Wörter aller Dokumente, einmal je gefalteter Form. Als Schreibweise wird eine mit echten
+/// Umlauten bevorzugt ("Primärschlüssel" statt "primaerschluessel" aus einem Tag)
+fn wortliste<'a>(texte: impl Iterator<Item = &'a str>) -> Vec<Vokabel> {
+    let mut liste: HashMap<String, (String, u32)> = HashMap::new();
+    for text in texte {
+        for w in text.split(|c: char| !c.is_alphanumeric()).filter(|w| w.chars().count() >= 4) {
+            let eintrag = liste.entry(falten(w)).or_insert_with(|| (w.to_string(), 0));
+            eintrag.1 += 1;
+            if !eintrag.0.chars().any(|c| "äöüÄÖÜß".contains(c)) && w.chars().any(|c| "äöüÄÖÜß".contains(c)) {
+                eintrag.0 = w.to_string();
+            }
+        }
+    }
+    liste
+        .into_iter()
+        .map(|(g, (original, anzahl))| Vokabel {
+            // "ae" wie "ä" behandeln – auch wenn ein Wort nur als "Primaerschluessel" vorkommt
+            einfach: g.replace("ae", "a").replace("oe", "o").replace("ue", "u").chars().collect(),
+            gefaltet: g.chars().collect(),
+            original,
+            anzahl,
+        })
+        .collect()
+}
+
+/// Bis zu 5 ähnlich geschriebene Wörter (gefaltet, Schreibweise im Text).
+/// Ab 6 Buchstaben ein Fehler erlaubt, ab 9 zwei (höchstens `hoechstens`); der erste Buchstabe muss stimmen.
+/// (Kürzere Wörter nicht: sonst findet "Datei" auch "Daten" und "Model" auch "Modul".)
+fn aehnliche(roh: &str, liste: &[Vokabel], hoechstens: usize) -> Vec<(String, String)> {
+    let roh = roh.trim_matches(|c: char| !c.is_alphanumeric());
+    let gefaltet: Vec<char> = falten(roh).chars().collect();
+    let einfach_w: Vec<char> = einfach(roh).chars().collect();
+    let laenge = einfach_w.len();
+    if laenge < 6 {
+        return Vec::new();
+    }
+    let erlaubt = (if laenge >= 9 { 2 } else { 1 }).min(hoechstens);
+    let mut kandidaten: Vec<(usize, u32, &Vokabel)> = liste
+        .iter()
+        .filter(|v| v.gefaltet.first() == gefaltet.first() && v.gefaltet != gefaltet)
+        .filter_map(|v| {
+            let d = abstand_zum_anfang(&gefaltet, &v.gefaltet, erlaubt).min(abstand_zum_anfang(&einfach_w, &v.einfach, erlaubt));
+            (d <= erlaubt).then_some((d, v.anzahl, v))
+        })
+        .collect();
+    kandidaten.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)).then(a.2.original.cmp(&b.2.original)));
+    kandidaten.into_iter().take(5).map(|(_, _, v)| (v.gefaltet.iter().collect(), v.original.clone())).collect()
 }
 
 /// (Frontmatter, Rest) – der Rest beginnt nach der schließenden "---"-Zeile
@@ -190,19 +323,33 @@ pub fn lernfeld_nummer(ordner: &str) -> Option<u32> {
 /// Marker wie ❓ und 🙋 gehen als ganz normale Suchwörter.
 pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
     let mut woerter: Vec<String> = Vec::new();
+    let mut rohe: Vec<String> = Vec::new(); // wie getippt – für die ähnliche Schreibweise
     let mut lernfeld: Option<u32> = None;
     let mut tag_filter: Vec<String> = Vec::new();
-    for w in falten(anfrage).split_whitespace() {
-        if let Some(lf) = lernfeld_filter(w) {
+    for roh in anfrage.split_whitespace() {
+        let w = falten(roh);
+        if let Some(lf) = lernfeld_filter(&w) {
             lernfeld = Some(lf);
         } else if let Some(t) = w.strip_prefix('#').filter(|t| !t.is_empty()) {
             tag_filter.push(t.to_string());
         } else if w.chars().count() >= 2 || !w.chars().all(char::is_alphanumeric) {
-            woerter.push(w.to_string());
+            woerter.push(w);
+            rohe.push(roh.to_string());
         }
     }
-    let mut treffer = Vec::new();
 
+    // 1. Alle Notizen und PDF-Texte einlesen
+    struct Dokument {
+        ordner: String,
+        datei: Option<String>,
+        titel: String,
+        datum: String,
+        text: String,
+        art: &'static str,
+        pdf: Option<String>,
+        geaendert: u64,
+    }
+    let mut dokumente: Vec<Dokument> = Vec::new();
     for ordner in ordner_liste(root).unwrap_or_default() {
         if ordner == "Gerettet" || ordner == crate::notizen::CLAUDE_ORDNER {
             continue; // Konfliktkopien und Claude-Anleitung nicht in der Suche
@@ -234,23 +381,17 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
             if !tag_filter.iter().all(|t| notiz_tags.iter().any(|n| n.starts_with(t.as_str()))) {
                 continue;
             }
-            // Tags zählen wie Titelwörter
-            let titel_und_tags = format!("{titel} {}", notiz_tags.join(" "));
-            let punkte = if woerter.is_empty() { Some(0) } else { bewerten(&titel_und_tags, text, &woerter) };
-            if let Some(punkte) = punkte {
-                treffer.push(Treffer {
-                    ordner: ordner.clone(),
-                    datei: Some(datei.clone()),
-                    titel: titel.clone(),
-                    datum: datum.clone(),
-                    ausschnitt: String::new(),
-                    text: text.to_string(),
-                    art: "notiz",
-                    pdf: None,
-                    punkte,
-                    geaendert: *geaendert,
-                });
-            }
+            dokumente.push(Dokument {
+                ordner: ordner.clone(),
+                datei: Some(datei.clone()),
+                // Tags zählen wie Titelwörter
+                titel: format!("{titel}\u{0}{}", notiz_tags.join(" ")),
+                datum: datum.clone(),
+                text: text.to_string(),
+                art: "notiz",
+                pdf: None,
+                geaendert: *geaendert,
+            });
         }
 
         // PDF-Texte (assets/*.txt neben einem PDF) – nicht bei reinen Tag-Filtern
@@ -266,24 +407,78 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
                 continue;
             }
             let Ok(roh) = fs::read(e.path()) else { continue };
-            let text = String::from_utf8_lossy(&roh).into_owned();
-            let Some(punkte) = bewerten(&pdf_name, &text, &woerter) else { continue };
             let pdf_pfad = format!("assets/{pdf_name}");
             // Notiz finden, in der das PDF eingebunden ist
             let einbindung = notizen.iter().find(|(_, _, _, inhalt, _)| inhalt.contains(&pdf_pfad));
-            treffer.push(Treffer {
+            dokumente.push(Dokument {
                 ordner: ordner.clone(),
                 datei: einbindung.map(|n| n.0.clone()),
                 titel: pdf_name.clone(),
                 datum: einbindung.map(|n| n.2.clone()).unwrap_or_default(),
-                ausschnitt: String::new(),
-                text,
+                text: String::from_utf8_lossy(&roh).into_owned(),
                 art: "pdf",
                 pdf: Some(pdf_pfad),
-                punkte,
                 geaendert: 0,
             });
         }
+    }
+
+    // 2. Seltene Suchwörter um ähnliche Schreibweisen ergänzen. "Selten" statt "nirgends": Steht ein
+    //    Tippfehler selbst schon in ein, zwei Notizen, sollen die richtig geschriebenen trotzdem kommen.
+    let alles: Vec<String> = dokumente.iter().map(|d| falten(&format!("{} {}", d.titel, d.text))).collect();
+    let mut liste: Option<Vec<Vokabel>> = None;
+    let suchwoerter: Vec<Suchwort> = woerter
+        .iter()
+        .zip(&rohe)
+        .map(|(w, roh)| {
+            let mut wort = Suchwort { varianten: vec![w.clone()], originale: vec![None] };
+            let vorkommen = alles.iter().filter(|t| t.contains(w.as_str())).count();
+            if vorkommen >= SELTEN {
+                return wort;
+            }
+            let liste = liste.get_or_insert_with(|| wortliste(dokumente.iter().flat_map(|d| [d.titel.as_str(), d.text.as_str()])));
+            // Gibt es das Wort (selten), nur sehr ähnliche dazunehmen – sonst bringt "Normalform" auch "Normalfall"
+            let hoechstens = if vorkommen > 0 { 1 } else { 2 };
+            for (gefaltet, original) in aehnliche(roh, liste, hoechstens) {
+                // Wörter, die das Suchwort enthalten, findet die genaue Suche ohnehin
+                if !gefaltet.contains(w.as_str()) {
+                    wort.varianten.push(gefaltet);
+                    wort.originale.push(Some(original));
+                }
+            }
+            wort
+        })
+        .collect();
+
+    // 3. Bewerten
+    let mut treffer: Vec<Treffer> = Vec::new();
+    for d in dokumente {
+        let (punkte, gefunden, aehnlich) = if suchwoerter.is_empty() {
+            (0, Vec::new(), Vec::new())
+        } else {
+            let Some(b) = bewerten(&d.titel, &d.text, &suchwoerter) else { continue };
+            b
+        };
+        let mut aehnlich_eindeutig: Vec<String> = Vec::new();
+        for a in aehnlich {
+            if !aehnlich_eindeutig.contains(&a) {
+                aehnlich_eindeutig.push(a);
+            }
+        }
+        treffer.push(Treffer {
+            ordner: d.ordner,
+            datei: d.datei,
+            titel: d.titel.split('\u{0}').next().unwrap_or_default().to_string(),
+            datum: d.datum,
+            ausschnitt: String::new(),
+            art: d.art,
+            pdf: d.pdf,
+            woerter: gefunden,
+            aehnlich: aehnlich_eindeutig,
+            punkte,
+            geaendert: d.geaendert,
+            text: d.text,
+        });
     }
 
     // Ohne Suchwörter (leer oder nur Filter): zuletzt bearbeitete Notizen
@@ -296,7 +491,7 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
     // Ausschnitte erst jetzt – nur für die angezeigten Treffer
     if !woerter.is_empty() {
         for t in &mut treffer {
-            t.ausschnitt = ausschnitt(&t.text, &woerter);
+            t.ausschnitt = ausschnitt(&t.text, &t.woerter);
         }
     }
     treffer
@@ -381,6 +576,89 @@ mod tests {
         assert_eq!(suchen(&root, "groesse", 20).len(), 1);
     }
 
+    #[test]
+    fn findet_aehnliche_schreibweisen() {
+        let (_t, root) = schule();
+        fs::write(root.join("LF05/2026-10-10-Schluessel.md"), "# Schlüssel\n\nDer Primärschlüssel identifiziert jede Zeile.\n").unwrap();
+        // u statt ü, ein s zu wenig, e statt ä
+        for anfrage in ["Primerschlüsel", "primarschlusel", "Primärschlüsel"] {
+            let t = suchen(&root, anfrage, 20);
+            assert_eq!(t.len(), 1, "{anfrage}");
+            assert_eq!(t[0].aehnlich, vec!["Primärschlüssel"], "{anfrage}");
+            assert_eq!(t[0].woerter, vec!["primaerschluessel"], "{anfrage}");
+            assert!(t[0].ausschnitt.contains("Primärschlüssel"), "{anfrage}");
+        }
+        // vertauschte Buchstaben, auch im PDF-Text
+        let t = suchen(&root, "Erklräen", 20);
+        assert!(t.iter().any(|x| x.art == "pdf"));
+        // mehrere Wörter: eins genau, eins ähnlich
+        assert_eq!(suchen(&root, "transitive Abhängikeit", 20).len(), 1);
+        // zwei fehlende Buchstaben, Satzzeichen drumherum
+        assert_eq!(suchen(&root, "Primrschlüsel", 20).len(), 1);
+        assert_eq!(suchen(&root, "(Primerschlüsel)", 20).len(), 1);
+    }
+
+    #[test]
+    fn aehnlich_unabhaengig_von_schreibweise_und_reihenfolge() {
+        let (_t, root) = schule();
+        // Tag (gefaltet) und "ae"-Schreibweise neben der richtigen – egal, was zuerst gelesen wird
+        fs::write(root.join("LF05/2026-10-01-A.md"), "---\ntags: [primärschlüssel]\n---\n# A\nText\n").unwrap();
+        fs::write(root.join("LF05/2026-10-02-B.md"), "# B\nDer Primaerschluessel ist eindeutig.\n").unwrap();
+        fs::write(root.join("LF05/2026-10-03-C.md"), "# C\nDer Primärschlüssel ist eindeutig.\n").unwrap();
+        let t = suchen(&root, "Primerschlüsel", 20);
+        assert_eq!(t.len(), 3);
+        assert!(t.iter().all(|x| x.aehnlich == vec!["Primärschlüssel"]), "Hinweis mit echten Umlauten");
+        // Titel ohne angehängte Tags
+        assert!(t.iter().any(|x| x.titel == "A"));
+    }
+
+    #[test]
+    fn eigener_tippfehler_findet_auch_richtige_schreibweise() {
+        let (_t, root) = schule();
+        fs::write(root.join("LF05/2026-10-04-Falsch.md"), "# Falsch\nDer Primerschlüssel ist eindeutig.\n").unwrap();
+        fs::write(root.join("LF05/2026-10-05-Richtig.md"), "# Richtig\nDer Primärschlüssel ist eindeutig.\n").unwrap();
+        let t = suchen(&root, "Primerschlüssel", 20);
+        assert_eq!(t.len(), 2);
+        assert_eq!(t[0].titel, "Falsch", "genauer Treffer vor ähnlichem");
+        assert!(t[0].aehnlich.is_empty());
+        assert_eq!(t[1].aehnlich, vec!["Primärschlüssel"]);
+    }
+
+    #[test]
+    fn aehnliche_varianten_zaehlen_nur_einmal() {
+        let (_t, root) = schule();
+        fs::write(root.join("LF05/2026-10-06-N.md"), "# N\nNormalformen und Normalformung.\n").unwrap();
+        let t = suchen(&root, "lf5 Normalfrom", 20);
+        assert!(t.iter().all(|x| x.woerter.len() == 1), "{:?}", t.iter().map(|x| &x.woerter).collect::<Vec<_>>());
+        assert!(suchen(&root, "lf9 Normalfrom", 20).is_empty(), "nur im gefilterten Lernfeld");
+    }
+
+    #[test]
+    fn genaue_treffer_bleiben_genau() {
+        let (_t, root) = schule();
+        let t = suchen(&root, "normalform", 20);
+        assert!(t.iter().all(|x| x.aehnlich.is_empty()));
+        // kurze Wörter und ganz andere Wörter finden nichts Ähnliches
+        assert!(suchen(&root, "jojn", 20).is_empty(), "kurze Wörter: keine Korrektur");
+        fs::write(root.join("LF05/2026-10-11-Daten.md"), "# Daten\nDaten und Netzmaske\n").unwrap();
+        assert!(suchen(&root, "Datei", 20).is_empty(), "Datei ist nicht Daten");
+        assert!(suchen(&root, "Netze", 20).is_empty());
+        // seltenes, richtig geschriebenes Wort: keine entfernt ähnlichen Wörter dazu
+        fs::write(root.join("LF05/2026-10-12-Fall.md"), "# Fall\nIm Normalfall gilt das.\n").unwrap();
+        assert!(suchen(&root, "Normalform", 20).iter().all(|x| x.aehnlich.is_empty()));
+        assert!(suchen(&root, "Fahrrad", 20).is_empty());
+        // erster Buchstabe muss stimmen
+        assert!(suchen(&root, "Mormalform", 20).is_empty());
+    }
+
+    #[test]
+    fn abstand_zaehlt_tippfehler() {
+        let z = |s: &str| s.chars().collect::<Vec<_>>();
+        assert_eq!(abstand(&z("daten"), &z("dtaen")), 1);
+        assert_eq!(abstand(&z("primer"), &z("primar")), 1);
+        assert_eq!(abstand_zum_anfang(&z("normalfrom"), &z("normalformen"), 1), 1);
+    }
+
     /// Geschwindigkeit mit 1000 Notizen à ~3 KB (läuft nur mit `cargo test -- --ignored`)
     #[test]
     #[ignore]
@@ -400,6 +678,12 @@ mod tests {
         let dauer = start.elapsed();
         println!("1008 Notizen durchsucht in {dauer:?}, {} Treffer", t.len());
         assert!(dauer.as_millis() < 1000);
+        // mit Tippfehler: ähnliche Schreibweise suchen
+        let start = std::time::Instant::now();
+        let t = suchen(&root, "Normalfrom", 50);
+        let dauer = start.elapsed();
+        println!("mit Tippfehler in {dauer:?}, {} Treffer", t.len());
+        assert!(!t.is_empty() && dauer.as_millis() < 1000);
     }
 
     #[test]

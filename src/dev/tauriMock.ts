@@ -163,7 +163,7 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
           if (!woerter.every((w) => t.includes(w))) continue;
           const zeile = inhalt.split("\n").find((z) => !z.startsWith("# ") && woerter.some((w) => falten(z).includes(w))) ?? "";
           const i = info(d, inhalt);
-          treffer.push({ ordner: o, datei: d, titel: i.titel, datum: i.datum, ausschnitt: zeile.replace(/^[#>\-\s]+/, ""), art: "notiz", pdf: null });
+          treffer.push({ ordner: o, datei: d, titel: i.titel, datum: i.datum, ausschnitt: zeile.replace(/^[#>\-\s]+/, ""), art: "notiz", pdf: null, woerter: [], aehnlich: [] });
         }
       }
       return treffer.slice(0, 50);
