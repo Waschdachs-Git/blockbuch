@@ -18,6 +18,7 @@ ZIEL="$HOME/Applications/Blockbuch.app"
 mkdir -p "$HOME/Applications"
 rm -rf "$ZIEL.alt"
 [ -d "$ZIEL" ] && mv "$ZIEL" "$ZIEL.alt"
-cp -R "$QUELLE" "$ZIEL"
+# verschieben statt kopieren: sonst findet Spotlight zwei Blockbuch-Apps
+mv "$QUELLE" "$ZIEL"
 rm -rf "$ZIEL.alt"
 echo "Fertig: $ZIEL – starten über Launchpad, Spotlight (⌘ Leertaste „Blockbuch“) oder den Finder."
