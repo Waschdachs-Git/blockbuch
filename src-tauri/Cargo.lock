@@ -284,6 +284,7 @@ name = "blockbuch"
 version = "0.1.0"
 dependencies = [
  "notify-debouncer-mini",
+ "objc2-foundation",
  "percent-encoding",
  "serde",
  "serde_json",

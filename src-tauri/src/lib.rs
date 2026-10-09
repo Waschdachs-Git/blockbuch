@@ -274,8 +274,23 @@ async fn notiz_loeschen(app: tauri::AppHandle, ordner: String, datei: String) ->
     notizen::notiz_loeschen(&schule_pfad(&app)?, &ordner, &datei)
 }
 
+/// Rechtschreibprüfung beim Tippen (rote Unterstreichung). WebKit liest die Einstellung beim Start aus
+/// den App-Einstellungen; in eigenen Apps ist sie anders als in Safari standardmäßig aus.
+/// Nur setzen, wenn noch nichts eingestellt ist – eine bewusste Entscheidung bleibt erhalten.
+#[cfg(target_os = "macos")]
+fn rechtschreibung_einschalten() {
+    use objc2_foundation::{NSString, NSUserDefaults};
+    let einstellungen = NSUserDefaults::standardUserDefaults();
+    let schluessel = NSString::from_str("WebContinuousSpellCheckingEnabled");
+    if einstellungen.objectForKey(&schluessel).is_none() {
+        einstellungen.setBool_forKey(true, &schluessel);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "macos")]
+    rechtschreibung_einschalten();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         // Navigationsschutz: weder App noch Grafik-Rahmen dürfen zu fremden Seiten wechseln

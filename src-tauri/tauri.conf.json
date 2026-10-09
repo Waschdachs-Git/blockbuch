@@ -23,7 +23,8 @@
           "x": 18,
           "y": 22
         },
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "zoomHotkeysEnabled": true
       }
     ],
     "security": {

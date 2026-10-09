@@ -434,6 +434,11 @@ button {
   display: none;
 }
 
+/* Ordner-Leiste eingeklappt: Der gewonnene Platz geht an die Notiz (PDFs, Grafiken, Tabellen) */
+.app--ohne-sidebar .inhalt {
+  max-width: 1040px;
+}
+
 .inhalt {
   max-width: 760px;
   margin: 0 auto;
