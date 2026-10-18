@@ -279,6 +279,7 @@ const VORLAGEN: &[(&str, &str, bool)] = &[
     (".claude/commands/woche.md", include_str!("../vorlagen/commands/woche.md"), true),
     (".claude/commands/korrigieren.md", include_str!("../vorlagen/commands/korrigieren.md"), true),
     (".claude/commands/grafik.md", include_str!("../vorlagen/commands/grafik.md"), true),
+    (".claude/commands/rechtschreibung.md", include_str!("../vorlagen/commands/rechtschreibung.md"), true),
 ];
 
 /// Hier merkt sich die App, welche Vorlagen-Fassung sie selbst geschrieben hat

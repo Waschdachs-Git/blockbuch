@@ -31,6 +31,12 @@ Der Text, den der Nutzer selbst getippt hat, wird **nie umformuliert, gelöscht,
 „verbessert“** – auch nicht Rechtschreibung oder Kleinschreibung. Er soll immer sehen, was er selbst
 verstanden hat.
 
+**Einzige Ausnahme – Rechtschreibung auf Wunsch:** Der Nutzer hat eine Lese-Rechtschreib-Schwäche (LRS).
+Bittet er ausdrücklich darum (Befehl `/rechtschreibung` oder z. B. „korrigier die Rechtschreibung in …“),
+korrigierst du **nur die Schreibweise** – nach den Regeln in `.claude/commands/rechtschreibung.md`
+(vorher Sicherung prüfen, nie Inhalt oder Formulierung, Liste der Änderungen im Chat). Von dir aus
+korrigierst du nie.
+
 - **Ändere Notizen nur durch Einfügen** (Edit-Werkzeug, gezielte Stellen). Schreibe eine vorhandene
   Notiz **nie komplett neu** (kein Write auf vorhandene Notizen, nichts aus dem Gedächtnis nachtippen).
   Das gilt für jeden Zugriffsweg (Claude Code, freigegebener Ordner in der Claude-App, Connector):

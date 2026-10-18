@@ -43,6 +43,13 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 - Schnellmarker im Unterricht: ⇧⌘U ❓ (nicht verstanden) und ⇧⌘L 🙋 (später nachfragen)
 - Markdown aus claude.ai einfügen: wird formatiert übernommen
 
+**Hilfen beim Schreiben (auch bei LRS)**
+- Rechtschreibprüfung beim Tippen (rote Unterstreichung, Vorschläge per Rechtsklick)
+- Wortvorschläge: nach 3 Buchstaben erscheint grau das passende Fachwort aus den eigenen Notizen und
+  PDFs, Tab übernimmt es – auch bei Tippfehlern (`Primer` → `Primärschlüssel`)
+- `/rechtschreibung`: Claude korrigiert nur die Schreibweise der Mitschrift und zeigt die Änderungen
+- Ansicht vergrößern mit ⌘+ / ⌘−, breiterer Text bei eingeklappter Ordner-Leiste
+
 **Dateien**
 - Bilder, Screenshots und iPhone-Fotos (HEIC wird automatisch umgewandelt) per Drag & Drop oder ⌘V
 - PDFs direkt in der Notiz (pdf.js). Der Text wird im Hintergrund für Claude als `.txt` abgelegt
@@ -55,7 +62,8 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 - Grafiken laufen in einer Sandbox: kein Netzwerk, kein Zugriff auf die App, Start erst per Klick
 
 **Finden**
-- Volltextsuche mit ⌘K, die Umlaute toleriert (`ueber` findet `über`)
+- Volltextsuche mit ⌘K, die Umlaute toleriert (`ueber` findet `über`) und Tippfehler verzeiht
+  (`Primerschlüsel` findet `Primärschlüssel`)
 - Filter wie `lf2` oder `#tag`, auch die Marker ❓ und 🙋 sind suchbar
 
 ## Tastenkürzel
@@ -70,6 +78,8 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 | ⇧⌘U / ⇧⌘L | Marker ❓ / 🙋 |
 | ⌥⌘L | Sprache eines Code-Blocks |
 | `/` | Block einfügen |
+| Tab / Esc | Wortvorschlag übernehmen / ausblenden |
+| ⌘+ / ⌘− / ⌘0 | Ansicht vergrößern / verkleinern / zurücksetzen |
 | ← → ↑ ↓ | Zwischen Ordnern, Notizen und Editor wechseln |
 
 ## Claude-Befehle
@@ -84,6 +94,7 @@ In `~/Schule` legt Blockbuch Vorlagen für Claude an:
 | `/korrigieren` | Antworten auf Übungsfragen bewerten wie die IHK, mit Teilpunkten |
 | `/woche` | Wochenrückblick: Berichtsheft-Text, offene Fragen, Lernaufträge |
 | `/grafik` | Animierte, interaktive Grafik bauen und in die Notiz einfügen |
+| `/rechtschreibung` | Nur die Rechtschreibung der Mitschrift korrigieren (Hilfe bei LRS), mit Liste der Änderungen |
 
 ## Technik
 
