@@ -68,6 +68,18 @@ Ergänzungen schreibst du **nur in Claude-Kästen**:
   **Liste, Tabelle oder einem Codeblock, kommt der Kasten nach dem ganzen Block** – nie mitten hinein
   (sonst zerreißt die Liste). Mehrere Kästen zu einem Block: zu einem Kasten zusammenfassen, Bezug
   jeweils fett voranstellen (`**Zu 1NF:** …`).
+- **Eingeklappt:** Längere Erklärungen (ab etwa 6 Zeilen, z. B. unter einer Grafik oder einem PDF)
+  schreibst du eingeklappt – mit `-` hinter der Kennung, einem kurzen Titel und **einer Leerzeile `>`
+  danach** (sonst gehört die erste Textzeile mit zur sichtbaren Titelzeile):
+
+  ```markdown
+  > [!claude]- Erklärung zur Grafik
+  >
+  > Ein **INNER JOIN** liefert nur Zeilen, die in beiden Tabellen passen …
+  ```
+
+  Der Nutzer klappt den Kasten in der App mit einem Klick auf. Kurze Kästen, `❓`-Erklärungen und
+  „Kurz zusammengefasst“ bleiben offen (ohne `-`).
 - **Eigene Kästen** (`[!claude]`) darfst du später aktualisieren statt doppelt anzulegen.
 - Kästen des Nutzers – `> [!merke]`, `> [!tipp]`, `> [!achtung]` – nie ändern.
 - `> [!karten]` = Karteikarten, eine pro Zeile `> Frage :: Antwort` (kein `::` in Frage/Antwort,
@@ -174,6 +186,11 @@ PDF-Blöcke (```` ```pdf ````).
 
 **Nicht verwenden:** HTML (`<details>`, `<br>` …), Fußnoten, Unterstreichen, `===`-Überschriften.
 Notizen mit HTML öffnet die App nur schreibgeschützt.
+
+Einzige Ausnahme: Eine Zeile wie `<!-- spalten: 160 320 0 -->` direkt über einer Tabelle speichert
+die Spaltenbreiten, die der Nutzer in der App gezogen hat. Sie gehört zur Tabelle – **nicht löschen
+und nicht von der Tabelle trennen**. Fügst du eine Spalte hinzu, hänge eine `0` (= automatisch) an
+der passenden Stelle an. Selbst brauchst du sie nicht zu schreiben.
 
 ## Versionen (Git)
 

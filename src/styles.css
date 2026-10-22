@@ -600,6 +600,25 @@ button {
   margin: 0;
 }
 
+/* Spaltenbreite ziehen: Linie am Spaltenrand unter der Maus (gespeichert über der Tabelle, tabelle.ts) */
+.inhalt .tableWrapper {
+  overflow-x: auto;
+}
+
+.inhalt .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -1px;
+  width: 4px;
+  background: var(--akzent);
+  pointer-events: none;
+}
+
+.inhalt.resize-cursor {
+  cursor: col-resize;
+}
+
 .inhalt .selectedCell::after {
   content: "";
   position: absolute;
@@ -814,6 +833,43 @@ button {
 
 .inhalt .kasten--achtung .kasten__kennung::before {
   background: var(--achtung-rand);
+}
+
+/* Etikett ist zugleich der Knopf zum Auf-/Zuklappen */
+.inhalt .kasten__kennung {
+  cursor: pointer;
+}
+
+/* Pfeil: offen ⌄, zu › (aus zwei Rändern gezeichnet – Schriftzeichen wären bei font-size 0 zu klein) */
+.inhalt .kasten__kennung::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 10px 3px 0;
+  border-right: 1.5px solid var(--text-leise);
+  border-bottom: 1.5px solid var(--text-leise);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.inhalt .kasten--zu .kasten__kennung::after {
+  margin-bottom: 1px;
+  transform: rotate(-45deg);
+}
+
+/* Zugeklappt: nur die erste Zeile bleibt sichtbar */
+.inhalt blockquote.kasten--zu > :not(:first-child) {
+  display: none;
+}
+
+.inhalt blockquote.kasten--zu > :first-child::after {
+  content: " …";
+  color: var(--text-leise);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inhalt .kasten__kennung::after { transition: none; }
 }
 
 .marker-anzeige {
@@ -1112,6 +1168,58 @@ button {
 
 .pdf__seite + .pdf__seite {
   margin-top: 8px;
+}
+
+/* PDF wie Papier in der Notiz: kein Rahmen, keine Leiste – die Knöpfe erscheinen beim Darüberfahren
+   oder wenn der Block markiert ist (oben rechts über der ersten Seite) */
+.inhalt .grafik.pdf {
+  position: relative;
+  border: 0;
+  border-radius: 6px;
+  overflow: visible;
+  background: transparent;
+}
+
+.grafik.pdf .grafik__leiste {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--linie);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.grafik.pdf:hover .grafik__leiste,
+.grafik.pdf:focus-within .grafik__leiste,
+.grafik.pdf.ProseMirror-selectednode .grafik__leiste {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.grafik.pdf .grafik__name {
+  max-width: 220px;
+  margin-right: 4px;
+}
+
+.grafik.pdf .pdf__seiten {
+  padding: 4px;
+  background: transparent;
+}
+
+/* Markierter Block (Pfeiltasten/Rücktaste): Rahmen in Akzentfarbe, wie bei Bildern */
+.inhalt .grafik.ProseMirror-selectednode {
+  outline: 2px solid var(--akzent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grafik.pdf .grafik__leiste { transition: none; }
 }
 
 .pdf__hinweis {

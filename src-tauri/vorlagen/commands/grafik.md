@@ -13,5 +13,7 @@ Baue eine animierte Lern-Grafik zu: $ARGUMENTS
    hell/dunkel, Abspielen/Pause/Schritt, Erklärtext pro Schritt, ruhiges Tempo, keine Endlosschleifen).
 4. Füge den ```` ```grafik ````-Block mit `src:` und passender `höhe:` in die Notiz ein – nach dem
    Abschnitt, zu dem sie gehört (nie mitten in eine Liste). Mitschrift nicht verändern.
+   Eine Erklärung zur Grafik kommt direkt darunter in einen **eingeklappten** Kasten
+   (`> [!claude]- Erklärung zur Grafik`, dann `>`, dann der Text) – so bleibt die Notiz übersichtlich.
 5. Antworte im Chat kurz: wo die Grafik steht und was sie zeigt. Biete an, sie anzupassen
    (Tempo, Beispielwerte, mehr Schritte).

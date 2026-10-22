@@ -126,7 +126,9 @@ function zeichen(text: string): string {
  *  `zurueck` ist das (aufgeräumte) Markdown, das der Editor nach dem Laden erzeugen würde.
  *  Zusätzliche Zeichen sind ok (z. B. "mailto:" bei E-Mail-Links) – nur fehlende zählen. */
 export function wuerdeInhaltVerlieren(original: string, zurueck: string): boolean {
-  const a = zeichen(original);
+  // Spaltenbreiten-Kommentar über Tabellen (tabelle.ts): fällt er weg (z. B. "0 0" oder keine Tabelle
+  // mehr darunter), gehen nur Breiten verloren, kein Text – deshalb nicht schreibgeschützt öffnen
+  const a = zeichen(original.replace(/<!--[ \t]*spalten:[^>]*-->/gi, ""));
   const b = zeichen(zurueck);
   let j = 0;
   for (const c of a) {

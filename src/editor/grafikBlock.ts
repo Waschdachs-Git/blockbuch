@@ -13,6 +13,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import type { Editor } from "@tiptap/core";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import type { NodeView } from "@tiptap/pm/view";
+import { angabenBearbeiten, angabenOffen } from "./blockAuswahl";
 
 /** Ordner der gerade offenen Notiz – setzt EditorPane vor dem Laden */
 let aktuellerOrdner = "";
@@ -149,9 +150,15 @@ export function grafikNodeView(node: PMNode, editor: Editor, getPos: () => numbe
       vollbild(!dom.classList.contains("ist-vollbild"));
     }),
     knopf("</>", "Angaben bearbeiten (src, höhe)", () => {
-      quelle.hidden = !quelle.hidden;
-      automatischOffen = false;
-      if (!quelle.hidden) editor.commands.focus();
+      const pos = getPos();
+      if (typeof pos !== "number") return;
+      if (angabenOffen(editor.state, pos, aktuell) && grafikAngaben(aktuell.textContent).src) {
+        // wieder schließen: Block als Ganzes markieren
+        editor.chain().focus().setNodeSelection(pos).run();
+        return;
+      }
+      editor.view.dispatch(angabenBearbeiten(editor.state, pos, aktuell));
+      editor.commands.focus();
     }),
     schliessen,
   );
@@ -182,8 +189,7 @@ export function grafikNodeView(node: PMNode, editor: Editor, getPos: () => numbe
       gezeigt = url;
       rahmen.src = url;
     }
-    // Ohne Datei die Angaben gleich zeigen, damit man sie eintragen kann
-    if (!src) quelle.hidden = false;
+    angabenZeigen();
   }
   zeige();
 
@@ -195,24 +201,12 @@ export function grafikNodeView(node: PMNode, editor: Editor, getPos: () => numbe
   };
   window.addEventListener(ASSETS_GEAENDERT, beiAenderung);
 
-  // Gerät der Cursor in den Block (Pfeiltasten, Backspace), die Angaben einblenden –
-  // sonst würde man unsichtbar hineintippen
-  // (automatisch geöffnet → beim Verlassen wieder schließen; per </> geöffnet → offen lassen)
-  let automatischOffen = false;
-  const beiAuswahl = () => {
-    const pos = getPos();
-    if (typeof pos !== "number") return;
-    const { from, to } = editor.state.selection;
-    const drin = to > pos && from < pos + aktuell.nodeSize;
-    if (drin && quelle.hidden) {
-      quelle.hidden = false;
-      automatischOffen = true;
-    } else if (!drin && automatischOffen && grafikAngaben(aktuell.textContent).src) {
-      quelle.hidden = true;
-      automatischOffen = false;
-    }
-  };
-  editor.on("selectionUpdate", beiAuswahl);
+  // Angaben (src, höhe) nur zeigen, wenn bewusst geöffnet (</>) oder noch keine Datei eingetragen ist –
+  // sonst wird der Block wie ein Bild als Ganzes markiert (blockAuswahl.ts)
+  function angabenZeigen() {
+    quelle.hidden = !angabenOffen(editor.state, getPos(), aktuell);
+  }
+  editor.on("transaction", angabenZeigen);
 
   return {
     dom,
@@ -233,7 +227,7 @@ export function grafikNodeView(node: PMNode, editor: Editor, getPos: () => numbe
     destroy: () => {
       window.removeEventListener(ASSETS_GEAENDERT, beiAenderung);
       document.removeEventListener("keydown", escImVollbild, true);
-      editor.off("selectionUpdate", beiAuswahl);
+      editor.off("transaction", angabenZeigen);
     },
   };
 }

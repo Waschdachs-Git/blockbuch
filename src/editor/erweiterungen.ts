@@ -9,6 +9,7 @@ import { SichererCodeBlock } from "./codeBlock";
 import { Kaesten } from "./kaesten";
 import { KeineGeerbteFormatierung, SicheresFett, SicheresKursiv } from "./formatierung";
 import { Wortvorschlag } from "./wortvorschlag";
+import { TabelleMitBreiten } from "./tabelle";
 import { BildMitAssets, Dateiablage } from "./dateiablage";
 
 export function editorErweiterungen(): Extensions {
@@ -22,7 +23,9 @@ export function editorErweiterungen(): Extensions {
     SichererCodeBlock,
     TaskList,
     TaskItem.configure({ nested: true }),
-    TableKit.configure({ table: { resizable: false } }),
+    // Tabelle selbst mit ziehbaren Spaltenbreiten (gespeichert als Kommentar über der Tabelle, tabelle.ts)
+    TableKit.configure({ table: false }),
+    TabelleMitBreiten,
     BildMitAssets,
     Dateiablage,
     Placeholder.configure({

@@ -37,9 +37,11 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 ## Funktionen
 
 **Schreiben**
-- Editor mit Überschriften, Listen, Checklisten, Tabellen und Code-Blöcken mit Syntax-Hervorhebung
+- Editor mit Überschriften, Listen, Checklisten, Tabellen (Spaltenbreite per Maus ziehbar) und
+  Code-Blöcken mit Syntax-Hervorhebung
 - `/`-Menü zum Einfügen von Blöcken, alles auch ohne Maus bedienbar
-- Kästen: `[!merke]`, `[!tipp]`, `[!achtung]`, `[!karten]` und `[!claude]` für Ergänzungen von Claude
+- Kästen: `[!merke]`, `[!tipp]`, `[!achtung]`, `[!karten]` und `[!claude]` für Ergänzungen von Claude –
+  per Klick aufs Etikett (oder ⌥⌘↩) ein- und ausklappbar, `> [!claude]-` startet eingeklappt
 - Schnellmarker im Unterricht: ⇧⌘U ❓ (nicht verstanden) und ⇧⌘L 🙋 (später nachfragen)
 - Markdown aus claude.ai einfügen: wird formatiert übernommen
 
@@ -79,6 +81,7 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 | ⌥⌘L | Sprache eines Code-Blocks |
 | `/` | Block einfügen |
 | Tab / Esc | Wortvorschlag übernehmen / ausblenden |
+| ⌥⌘↩ | Kasten ein- und ausklappen |
 | ⌘+ / ⌘− / ⌘0 | Ansicht vergrößern / verkleinern / zurücksetzen |
 | ← → ↑ ↓ | Zwischen Ordnern, Notizen und Editor wechseln |
 

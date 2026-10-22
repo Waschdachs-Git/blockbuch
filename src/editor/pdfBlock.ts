@@ -9,6 +9,7 @@ import type { Node as PMNode } from "@tiptap/pm/model";
 import type { NodeView } from "@tiptap/pm/view";
 import { api, fehlerText } from "../api";
 import { grafikAngaben, grafikOrdner } from "./grafikBlock";
+import { angabenBearbeiten, angabenOffen } from "./blockAuswahl";
 
 type PdfJs = typeof import("pdfjs-dist");
 let pdfjsLaden: Promise<PdfJs> | null = null;
@@ -79,8 +80,16 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
       const { src } = grafikAngaben(aktuell.textContent);
       if (src) api.inVorschauOeffnen(ordner, src).catch((e) => meldeFehler(e));
     }),
-    knopf("</>", "Angaben bearbeiten (src)", () => {
-      quelle.hidden = !quelle.hidden;
+    // Pfad ändern – nur auf Wunsch (sonst ist die Angabe versteckt, blockAuswahl.ts)
+    knopf("</>", "Pfad ändern (src)", () => {
+      const pos = getPos();
+      if (typeof pos !== "number") return;
+      if (angabenOffen(editor.state, pos, aktuell) && grafikAngaben(aktuell.textContent).src) {
+        editor.chain().focus().setNodeSelection(pos).run();
+        return;
+      }
+      editor.view.dispatch(angabenBearbeiten(editor.state, pos, aktuell));
+      editor.commands.focus();
     }),
   );
 
@@ -155,8 +164,8 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
   async function laden() {
     const { src } = grafikAngaben(aktuell.textContent);
     name.textContent = src ? `📄 ${src.replace(/^assets\//, "")}` : "PDF – noch keine Datei (src: assets/…)";
+    angabenZeigen();
     if (!src) {
-      quelle.hidden = false;
       hinweis("Trage bei src den Pfad zum PDF ein.");
       return;
     }
@@ -181,14 +190,12 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
   }
   laden();
 
-  // Cursor im Block → Angaben zeigen (sonst tippt man unsichtbar hinein)
-  const beiAuswahl = () => {
-    const pos = getPos();
-    if (typeof pos !== "number") return;
-    const { from, to } = editor.state.selection;
-    if (to > pos && from < pos + aktuell.nodeSize) quelle.hidden = false;
-  };
-  editor.on("selectionUpdate", beiAuswahl);
+  // Die Angaben (src) sind nur sichtbar, solange noch keine Datei eingetragen ist – sonst wird der
+  // Block wie ein Bild als Ganzes markiert (blockAuswahl.ts)
+  function angabenZeigen() {
+    quelle.hidden = !angabenOffen(editor.state, getPos(), aktuell);
+  }
+  editor.on("transaction", angabenZeigen);
 
   return {
     dom,
@@ -207,7 +214,7 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
     destroy: () => {
       zerstoert = true;
       beobachter.disconnect();
-      editor.off("selectionUpdate", beiAuswahl);
+      editor.off("transaction", angabenZeigen);
       pdf?.loadingTask.destroy();
     },
   };

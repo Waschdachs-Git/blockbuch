@@ -7,6 +7,7 @@ import { common, createLowlight } from "lowlight";
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { grafikNodeView } from "./grafikBlock";
 import { pdfNodeView } from "./pdfBlock";
+import { blockAuswahlPlugin } from "./blockAuswahl";
 
 const basis = createLowlight(common);
 /** Ohne bzw. mit unbekannter Sprache nicht raten (falsche Farben, langsam) – einfach als Text */
@@ -66,6 +67,11 @@ export const SichererCodeBlock = CodeBlockLowlight.extend({
         return !!auswahl;
       },
     };
+  },
+
+  // PDF-/Grafik-Blöcke wie ein Bild als Ganzes markieren (siehe blockAuswahl.ts)
+  addProseMirrorPlugins() {
+    return [...(this.parent?.() ?? []), blockAuswahlPlugin()];
   },
 
   // Sprachauswahl oben rechts im Block (Tastatur: ⌥⌘L im Codeblock, oder Sprache direkt per ```java)
