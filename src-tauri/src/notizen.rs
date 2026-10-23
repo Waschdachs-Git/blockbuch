@@ -619,8 +619,53 @@ pub fn asset_lesen(root: &Path, ordner: &str, pfad: &str) -> Ergebnis<Vec<u8>> {
 }
 
 pub fn notiz_loeschen(root: &Path, ordner: &str, datei: &str) -> Ergebnis<()> {
-    let pfad = notiz_pfad(root, ordner, datei)?;
-    // In den Papierkorb, nicht endgültig – lässt sich im Finder wiederherstellen
+    in_papierkorb(&notiz_pfad(root, ordner, datei)?)
+}
+
+/// Ganzen Ordner (mit Notizen und assets/) in den Papierkorb. Der Claude-Ordner nicht – den braucht
+/// die App (Anleitung und Profil für Claude) und würde ihn ohnehin neu anlegen.
+pub fn ordner_loeschen(root: &Path, ordner: &str) -> Ergebnis<()> {
+    let pfad = ordner_pfad(root, ordner)?;
+    // Auch "claude" (APFS unterscheidet Groß/Klein nicht) oder ein Verweis auf den Claude-Ordner
+    let claude = root.join(CLAUDE_ORDNER);
+    let gleich = |a: &Path, b: &Path| matches!((fs::canonicalize(a), fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y);
+    if ordner.eq_ignore_ascii_case(CLAUDE_ORDNER) || gleich(&pfad, &claude) || pfad == root {
+        return Err("Der Ordner „Claude“ wird von Blockbuch gebraucht und kann nicht gelöscht werden.".into());
+    }
+    in_papierkorb(&pfad)
+}
+
+/// Was liegt in einem Ordner? (Notizen, alle übrigen Dateien inkl. assets/ und Unterordner) – für die Rückfrage
+#[derive(serde::Serialize, Debug, PartialEq)]
+pub struct OrdnerInhalt {
+    pub notizen: u32,
+    pub dateien: u32,
+}
+
+pub fn ordner_inhalt(root: &Path, ordner: &str) -> Ergebnis<OrdnerInhalt> {
+    fn zaehle(pfad: &Path, tiefe: u32, notizen: &mut u32, dateien: &mut u32) {
+        for e in fs::read_dir(pfad).into_iter().flatten().flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name == ".DS_Store" {
+                continue;
+            }
+            let Ok(art) = e.file_type() else { continue };
+            if art.is_dir() {
+                zaehle(&e.path(), tiefe + 1, notizen, dateien);
+            } else if tiefe == 0 && name.ends_with(".md") && !name.starts_with('.') {
+                *notizen += 1;
+            } else {
+                *dateien += 1;
+            }
+        }
+    }
+    let (mut notizen, mut dateien) = (0, 0);
+    zaehle(&ordner_pfad(root, ordner)?, 0, &mut notizen, &mut dateien);
+    Ok(OrdnerInhalt { notizen, dateien })
+}
+
+/// In den Papierkorb, nicht endgültig – lässt sich im Finder wiederherstellen
+fn in_papierkorb(pfad: &Path) -> Ergebnis<()> {
     let mut ctx = trash::TrashContext::default();
     #[cfg(target_os = "macos")]
     {
@@ -640,6 +685,30 @@ mod tests {
         let root = tmp.path().join("Schule");
         schule_oeffnen(&root, &["LF05-Daten".to_string()]).unwrap();
         (tmp, root)
+    }
+
+    #[test]
+    fn claude_ordner_und_ungueltige_namen_nicht_loeschen() {
+        let (_t, root) = testordner();
+        fs::create_dir_all(root.join(CLAUDE_ORDNER)).unwrap();
+        assert!(ordner_loeschen(&root, CLAUDE_ORDNER).is_err());
+        assert!(ordner_loeschen(&root, "claude").is_err(), "Groß/Klein egal");
+        assert!(root.join(CLAUDE_ORDNER).is_dir());
+        assert!(ordner_loeschen(&root, "../Schule").is_err());
+        assert!(ordner_loeschen(&root, "").is_err());
+        assert!(ordner_loeschen(&root, "GibtsNicht").is_err());
+    }
+
+    #[test]
+    fn ordner_inhalt_zaehlt_auch_assets_und_unterordner() {
+        let (_t, root) = testordner();
+        fs::create_dir_all(root.join("LF9/assets")).unwrap();
+        fs::create_dir_all(root.join("LF9/Projekt/src")).unwrap();
+        fs::write(root.join("LF9/2026-10-01-A.md"), "# A").unwrap();
+        fs::write(root.join("LF9/assets/Blatt.pdf"), "%PDF").unwrap();
+        fs::write(root.join("LF9/Projekt/src/main.java"), "class X {}").unwrap();
+        fs::write(root.join("LF9/.DS_Store"), "").unwrap();
+        assert_eq!(ordner_inhalt(&root, "LF9").unwrap(), OrdnerInhalt { notizen: 1, dateien: 2 });
     }
 
     #[test]

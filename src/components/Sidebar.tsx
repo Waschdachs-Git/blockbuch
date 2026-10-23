@@ -10,13 +10,16 @@ type Props = {
   onAuswahl: (name: string) => void;
   onWeiter: () => void;
   onNeuerOrdner: (name: string) => Promise<boolean>;
+  /** Rechtsklick auf einen Ordner */
+  onMenue: (name: string, x: number, y: number) => void;
+  onHilfe: () => void;
   /** Hinweis unten, z. B. "Gesichert heute, 10:42" */
   sicherung: string | null;
   /** Zusatzinfo als Tooltip (z. B. nicht mitgesicherte Projektordner) */
   sicherungHinweis: string | null;
 };
 
-export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, onWeiter, onNeuerOrdner, sicherung, sicherungHinweis }: Props) {
+export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, onWeiter, onNeuerOrdner, onMenue, onHilfe, sicherung, sicherungHinweis }: Props) {
   const navRef = useRef<HTMLElement | null>(null);
   const [neuerOrdner, setNeuerOrdner] = useState<string | null>(null);
   const legtAn = useRef(false);
@@ -76,6 +79,12 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
           tabIndex={istAktiv ? 0 : -1}
           title={o.titel}
           onClick={() => onAuswahl(o.name)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            onAuswahl(o.name);
+            e.currentTarget.focus();
+            onMenue(o.name, e.clientX, e.clientY);
+          }}
         >
           <span className="sidebar__nummer sidebar__nummer--ordner" aria-hidden="true">
             <OrdnerIcon />
@@ -137,11 +146,16 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
           )}
         </ul>
       </div>
-      {sicherung && (
-        <div className={`sidebar__sicherung ${sicherung.startsWith("⚠") ? "ist-fehler" : ""}`} title={sicherungHinweis ?? "Automatische Sicherung (Git) – ⌘S sichert sofort, ⇧⌘H zeigt Versionen"}>
-          {sicherung}
-        </div>
-      )}
+      <div className="sidebar__fuss">
+        {sicherung && (
+          <div className={`sidebar__sicherung ${sicherung.startsWith("⚠") ? "ist-fehler" : ""}`} title={sicherungHinweis ?? "Automatische Sicherung (Git) – ⌘S sichert sofort, ⇧⌘H zeigt Versionen"}>
+            {sicherung}
+          </div>
+        )}
+        <button className="sidebar__hilfe" onClick={onHilfe} title="Hilfe (⌘?)" aria-label="Hilfe">
+          ?
+        </button>
+      </div>
     </nav>
   );
 }

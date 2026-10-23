@@ -6,6 +6,8 @@ import { NoteList } from "./components/NoteList";
 import { EditorPane, type EditorHandle } from "./components/EditorPane";
 import { Suche } from "./components/Suche";
 import { Versionen, zeitAnzeigen } from "./components/Versionen";
+import { Hilfe } from "./components/Hilfe";
+import { Kontextmenue, Rueckfrage, type MenueEintrag } from "./components/Kontextmenue";
 import { useStoredState } from "./useStoredState";
 import { ASSETS_GEAENDERT } from "./editor/grafikBlock";
 import { api, fehlerText, heute, type Aenderung, type NotizInfo, type SicherungsStand, type Treffer } from "./api";
@@ -23,6 +25,12 @@ function App() {
   const [sucheOffen, setSucheOffen] = useState(false);
   const [versionenOffen, setVersionenOffen] = useState(false);
   const [sicherung, setSicherung] = useState<SicherungsStand | null>(null);
+  const [hilfeOffen, setHilfeOffen] = useState(false);
+  const [menue, setMenue] = useState<{ x: number; y: number; eintraege: MenueEintrag[] } | null>(null);
+  const [rueckfrage, setRueckfrage] = useState<{ titel: string; text: string; ja: string; onJa: () => void } | null>(null);
+  const menueSchliessen = useCallback(() => setMenue(null), []);
+  const rueckfrageRef = useRef(rueckfrage);
+  rueckfrageRef.current = rueckfrage;
   // Notiz, die nach einem Ordnerwechsel (aus der Suche) ausgewählt werden soll
   const auswahlNachOrdnerwechsel = useRef<string | null>(null);
 
@@ -236,6 +244,73 @@ function App() {
     }
   }
 
+  /** Rechtsklick auf eine Notiz */
+  function notizMenue(datei: string, x: number, y: number) {
+    setAktiveDatei(datei);
+    setMenue({
+      x,
+      y,
+      eintraege: [
+        { titel: "Umbenennen", kuerzel: "↩", aktion: () => setUmbenennenDatei(datei) },
+        { titel: "In den Papierkorb", kuerzel: "⌘⌫", gefaehrlich: true, aktion: () => loeschen(datei) },
+      ],
+    });
+  }
+
+  /** Rechtsklick auf einen Ordner */
+  function ordnerMenue(name: string, x: number, y: number) {
+    setMenue({
+      x,
+      y,
+      eintraege: [
+        {
+          titel: "Ordner in den Papierkorb …",
+          gefaehrlich: true,
+          gesperrt: name === "Claude" ? "Den Ordner „Claude“ braucht Blockbuch (Anleitung und Profil für Claude)." : undefined,
+          aktion: () => ordnerLoeschenFragen(name),
+        },
+      ],
+    });
+  }
+
+  async function ordnerLoeschenFragen(name: string) {
+    let inhalt: { notizen: number; dateien: number };
+    try {
+      inhalt = await api.ordnerInhalt(name);
+    } catch (e) {
+      melde(e);
+      return;
+    }
+    const anzeige = alleOrdner.find((o) => o.name === name)?.anzeige ?? name;
+    const { notizen: n, dateien: d } = inhalt;
+    const teile = [n > 0 && (n === 1 ? "1 Notiz" : `${n} Notizen`), d > 0 && (d === 1 ? "1 weitere Datei (Bild, PDF …)" : `${d} weitere Dateien (Bilder, PDFs …)`)].filter(Boolean);
+    setRueckfrage({
+      titel: `„${anzeige}“ in den Papierkorb legen?`,
+      text:
+        (teile.length ? `Der Ordner mit ${teile.join(" und ")} wandert in den Papierkorb.` : "Der leere Ordner wandert in den Papierkorb.") +
+        " Von dort kannst du ihn im Finder wiederherstellen.",
+      ja: "In den Papierkorb",
+      onJa: async () => {
+        // aktuellerOrdnerRef statt `ordner`: Der Rechtsklick hat den Ordner gerade erst gewechselt.
+        // Der Dialog bleibt bis zum Ende offen – so tippt niemand in eine Notiz, deren Ordner gleich weg ist.
+        const istOffen = name === aktuellerOrdnerRef.current;
+        try {
+          if (istOffen) await editorRef.current?.speichernJetzt();
+          const liste = await api.ordnerLoeschen(name);
+          setOrdnerNamen(liste);
+          if (istOffen) setAktiverOrdner(ordnerAusNamen(liste).lernfelder[0]?.name ?? liste[0] ?? "");
+          setRueckfrage(null);
+          setStatusText(`„${anzeige}“ liegt im Papierkorb`);
+          window.setTimeout(() => setStatusText((t) => (t?.endsWith("liegt im Papierkorb") ? null : t)), 2500);
+          requestAnimationFrame(fokusSidebar);
+        } catch (e) {
+          setRueckfrage(null);
+          melde(e);
+        }
+      },
+    });
+  }
+
   async function neuerOrdner(name: string): Promise<boolean> {
     try {
       setOrdnerNamen(await api.ordnerErstellen(name));
@@ -288,11 +363,14 @@ function App() {
   // Menüpunkte aus der Mac-Menüleiste (⌘N, ⌥⌘S) – wirken auch, wenn eine Grafik den Fokus hat
   const menueRef = useRef<(id: string) => void>(() => {});
   menueRef.current = (id) => {
+    // Solange eine Rückfrage offen ist, keine Menübefehle (⌘N, ⌘K …) dahinter ausführen
+    if (rueckfrageRef.current) return;
     if (id === "neue-notiz") neueNotiz();
     if (id === "ordner-leiste") toggleSidebar();
     if (id === "suchen") setSucheOffen(true);
     if (id === "versionen" && aktiveDatei) setVersionenOffen(true);
     if (id === "sichern") jetztSichern();
+    if (id === "hilfe") setHilfeOffen(true);
   };
   useEffect(() => {
     let aktiv = true;
@@ -302,6 +380,18 @@ function App() {
       aktiv = false;
       abmelden?.();
     };
+  }, []);
+
+  // ⌘? öffnet die Hilfe (auf deutscher Tastatur ⇧ß – deshalb über e.key statt als Menükürzel)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.metaKey && !e.ctrlKey && !e.altKey && e.key === "?" && !rueckfrageRef.current) {
+        e.preventDefault();
+        setHilfeOffen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
   // Nur in der Browser-Simulation (ohne Mac-Menü) die Kürzel selbst abfangen
@@ -376,6 +466,8 @@ function App() {
         onAuswahl={setAktiverOrdner}
         onWeiter={fokusListe}
         onNeuerOrdner={neuerOrdner}
+        onMenue={ordnerMenue}
+        onHilfe={() => setHilfeOffen(true)}
         sicherung={
           sicherung?.fehler
             ? `⚠︎ Sicherung: ${sicherung.fehler}`
@@ -405,6 +497,7 @@ function App() {
         }}
         onWeiter={() => editorRef.current?.fokus()}
         onLoeschen={loeschen}
+        onMenue={notizMenue}
         onZurueck={fokusSidebar}
       />
       <EditorPane
@@ -432,6 +525,20 @@ function App() {
           ordnerName={(name) => alleOrdner.find((o) => o.name === name)?.anzeige ?? name}
           onOeffnen={trefferOeffnen}
           onSchliessen={() => setSucheOffen(false)}
+        />
+      )}
+      {hilfeOffen && <Hilfe onSchliessen={() => setHilfeOffen(false)} />}
+      {menue && <Kontextmenue x={menue.x} y={menue.y} eintraege={menue.eintraege} onSchliessen={menueSchliessen} />}
+      {rueckfrage && (
+        <Rueckfrage
+          titel={rueckfrage.titel}
+          text={rueckfrage.text}
+          ja={rueckfrage.ja}
+          onJa={rueckfrage.onJa}
+          onNein={() => {
+            setRueckfrage(null);
+            requestAnimationFrame(fokusSidebar);
+          }}
         />
       )}
       {statusText && !meldung && (

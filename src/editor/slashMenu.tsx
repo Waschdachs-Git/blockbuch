@@ -54,6 +54,24 @@ export const SLASH_EINTRAEGE: SlashEintrag[] = [
     aktion: (e, r) => e.chain().focus().deleteRange(r).insertContent(`${MARKER_FRAGEN} `).run() },
   { titel: "Trennlinie", hinweis: "---", stichworte: ["linie", "trenner", "hr"], icon: "—",
     aktion: (e, r) => e.chain().focus().deleteRange(r).setHorizontalRule().run() },
+  // Formatierung für das, was danach getippt wird (oder schneller: das Tastenkürzel). Am Ende der Liste,
+  // damit "/k" oder "/c" weiter zuerst Code/Checkliste findet. Eigener Schritt nach dem Löschen von
+  // "/fett" – sonst hebt KeineGeerbteFormatierung (formatierung.ts) die Formatierung gleich wieder auf.
+  { titel: "Fett", hinweis: "⌘B", stichworte: ["fett", "bold", "dick", "hervorheben"], icon: "B",
+    aktion: (e, r) => {
+      e.chain().focus().deleteRange(r).run();
+      e.commands.toggleBold();
+    } },
+  { titel: "Kursiv", hinweis: "⌘I", stichworte: ["kursiv", "italic", "schraeg", "schräg"], icon: "I",
+    aktion: (e, r) => {
+      e.chain().focus().deleteRange(r).run();
+      e.commands.toggleItalic();
+    } },
+  { titel: "Durchgestrichen", hinweis: "⌘⇧S", stichworte: ["durchgestrichen", "streichen", "strike"], icon: "S̶",
+    aktion: (e, r) => {
+      e.chain().focus().deleteRange(r).run();
+      e.commands.toggleStrike();
+    } },
 ];
 
 function filtern(query: string): SlashEintrag[] {

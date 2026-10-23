@@ -276,6 +276,20 @@ async fn notiz_umbenennen(app: tauri::AppHandle, ordner: String, datei: String, 
     notizen::notiz_umbenennen(&schule_pfad(&app)?, &ordner, &datei, &titel)
 }
 
+/// Inhalt eines Ordners zählen (für die Rückfrage vor dem Löschen)
+#[tauri::command]
+async fn ordner_inhalt(app: tauri::AppHandle, ordner: String) -> Ergebnis<notizen::OrdnerInhalt> {
+    notizen::ordner_inhalt(&schule_pfad(&app)?, &ordner)
+}
+
+/// Ordner in den Papierkorb (Rückfrage macht die Oberfläche)
+#[tauri::command]
+async fn ordner_loeschen(app: tauri::AppHandle, ordner: String) -> Ergebnis<Vec<String>> {
+    let root = schule_pfad(&app)?;
+    notizen::ordner_loeschen(&root, &ordner)?;
+    notizen::ordner_liste(&root)
+}
+
 #[tauri::command]
 async fn notiz_loeschen(app: tauri::AppHandle, ordner: String, datei: String) -> Ergebnis<()> {
     notizen::notiz_loeschen(&schule_pfad(&app)?, &ordner, &datei)
@@ -331,7 +345,9 @@ pub fn run() {
             beenden,
             notiz_erstellen,
             notiz_umbenennen,
-            notiz_loeschen
+            notiz_loeschen,
+            ordner_loeschen,
+            ordner_inhalt
         ])
         // Eigenes Menü: ⌘Q läuft über "beenden_anfragen" statt macOS direkt beenden zu lassen
         // (das Standard-"Beenden" schließt die App sofort, ohne dass die Oberfläche speichern kann)
@@ -402,9 +418,13 @@ pub fn run() {
                 )
                 .build()?;
             let fenster = SubmenuBuilder::new(h, "Fenster").minimize().close_window().build()?;
+            // ⌘? fängt die Oberfläche selbst ab (auf deutscher Tastatur ⇧ß – als Menükürzel unzuverlässig)
+            let hilfe = SubmenuBuilder::new(h, "Hilfe")
+                .item(&MenuItemBuilder::with_id("hilfe", "Blockbuch-Hilfe (⌘?)").build(h)?)
+                .build()?;
             app.set_menu(
                 MenuBuilder::new(h)
-                    .items(&[&app_menue, &ablage, &bearbeiten, &darstellung, &fenster])
+                    .items(&[&app_menue, &ablage, &bearbeiten, &darstellung, &fenster, &hilfe])
                     .build()?,
             )?;
             Ok(())

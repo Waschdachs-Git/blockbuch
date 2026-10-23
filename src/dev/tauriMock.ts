@@ -190,6 +190,14 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
     case "notiz_loeschen":
       delete fs[a.ordner][a.datei];
       return null;
+    case "ordner_inhalt": {
+      const namen = Object.keys(fs[a.ordner] ?? {});
+      return { notizen: namen.filter((n) => n.endsWith(".md") && !n.includes("/")).length, dateien: namen.filter((n) => n.includes("/")).length };
+    }
+    case "ordner_loeschen":
+      if (a.ordner === "Claude") throw "Der Ordner „Claude“ wird von Blockbuch gebraucht und kann nicht gelöscht werden.";
+      delete fs[a.ordner];
+      return ordner();
   }
   throw `Unbekannter Befehl: ${cmd}`;
 }

@@ -17,6 +17,8 @@ type Props = {
   onUmbenennen: (datei: string, titel: string) => void;
   onUmbenennenAbbrechen: () => void;
   onLoeschen: (datei: string) => void;
+  /** Rechtsklick: Menü an der Mausposition */
+  onMenue: (datei: string, x: number, y: number) => void;
   onZurueck: () => void;
   onWeiter: () => void;
 };
@@ -125,6 +127,11 @@ export function NoteList(props: Props) {
                     tabIndex={istAktiv || (!aktiveDatei && n === notizen[0]) ? 0 : -1}
                     onClick={() => props.onAuswahl(n.datei)}
                     onDoubleClick={() => props.onUmbenennenStart(n.datei)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.focus();
+                      props.onMenue(n.datei, e.clientX, e.clientY);
+                    }}
                     title="→ schreiben · Enter: umbenennen · ⌘⌫: in den Papierkorb"
                   >
                     <span className="notiz__titel">{n.titel}</span>

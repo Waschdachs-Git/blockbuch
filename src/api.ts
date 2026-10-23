@@ -58,6 +58,10 @@ export const api = {
   notizUmbenennen: (ordner: string, datei: string, titel: string) =>
     invoke<NotizInfo>("notiz_umbenennen", { ordner, datei, titel }),
   notizLoeschen: (ordner: string, datei: string) => invoke<void>("notiz_loeschen", { ordner, datei }),
+  /** Ordner mit allen Notizen in den Papierkorb – gibt die neue Ordnerliste zurück */
+  ordnerLoeschen: (ordner: string) => invoke<string[]>("ordner_loeschen", { ordner }),
+  /** Notizen und übrige Dateien (assets/, Unterordner) in einem Ordner */
+  ordnerInhalt: (ordner: string) => invoke<{ notizen: number; dateien: number }>("ordner_inhalt", { ordner }),
 };
 
 /** Heutiges Datum in lokaler Zeit als YYYY-MM-DD */

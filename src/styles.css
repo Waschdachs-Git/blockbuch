@@ -1349,12 +1349,40 @@ button {
 
 /* ---------- Schritt 9: Sicherung und Versionen ---------- */
 
-.sidebar__sicherung {
+.sidebar__fuss {
   flex: none;
-  padding: 8px 18px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 8px 18px;
+  border-top: 1px solid var(--linie);
+}
+
+.sidebar__sicherung {
+  flex: 1;
+  min-width: 0;
   font-size: 11px;
   color: var(--text-leise);
-  border-top: 1px solid var(--linie);
+}
+
+/* "?" unten rechts in der Ordner-Leiste: öffnet die Hilfe */
+.sidebar__hilfe {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  border: 1px solid var(--linie);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-leise);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sidebar__hilfe:hover {
+  color: var(--text);
+  background: var(--bg-hover);
 }
 
 .sidebar__sicherung.ist-fehler {
@@ -1510,4 +1538,208 @@ button {
 /* Suche: Hinweis, wenn eine ähnliche Schreibweise gefunden wurde */
 .suche__aehnlich {
   color: var(--akzent);
+}
+
+/* ---------- Rechtsklick-Menü, Rückfrage, Hilfe ---------- */
+
+.kontextmenue {
+  position: fixed;
+  z-index: 300;
+  min-width: 210px;
+  padding: 4px;
+  border: 1px solid var(--linie);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+}
+
+.kontextmenue__eintrag {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kontextmenue__eintrag:hover:not(:disabled),
+.kontextmenue__eintrag:focus-visible {
+  outline: none;
+  background: var(--akzent);
+  color: #fff;
+}
+
+.kontextmenue__eintrag.ist-gefaehrlich:not(:disabled) {
+  color: #c4314b;
+}
+
+.kontextmenue__eintrag.ist-gefaehrlich:hover:not(:disabled),
+.kontextmenue__eintrag.ist-gefaehrlich:focus-visible {
+  background: #c4314b;
+  color: #fff;
+}
+
+.kontextmenue__eintrag:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.kontextmenue kbd {
+  font: inherit;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.rueckfrage {
+  width: min(420px, 100%);
+  margin-top: 8vh;
+  padding: 20px 22px 16px;
+  border: 1px solid var(--linie);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.rueckfrage h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.rueckfrage p {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-leise);
+}
+
+.rueckfrage__knoepfe {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.knopf {
+  padding: 6px 12px;
+  border: 1px solid var(--linie);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.knopf--gefaehrlich {
+  border-color: #c4314b;
+  background: #c4314b;
+  color: #fff;
+}
+
+.knopf:focus-visible {
+  outline: 2px solid var(--akzent);
+  outline-offset: 2px;
+}
+
+.hilfe {
+  width: min(720px, 100%);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--linie);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  outline: none;
+}
+
+.hilfe__kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px 22px;
+  border-bottom: 1px solid var(--linie);
+}
+
+.hilfe__kopf h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.hilfe__inhalt {
+  padding: 4px 22px 20px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.hilfe__inhalt h3 {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--akzent);
+}
+
+.hilfe__inhalt p {
+  margin: 0 0 8px;
+}
+
+.hilfe__inhalt code,
+.hilfe kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--linie);
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.hilfe__tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+}
+
+.hilfe__tabelle th {
+  width: 38%;
+  padding: 4px 12px 4px 0;
+  font-weight: normal;
+  text-align: left;
+  vertical-align: top;
+}
+
+.hilfe__tabelle td {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--linie);
+}
+
+.hilfe__tabelle th {
+  border-bottom: 1px solid var(--linie);
+}
+
+.hilfe__zusatz {
+  color: var(--text-leise);
+  font-size: 12px;
+}
+
+.kontextmenue:focus {
+  outline: none;
+}
+
+.kontextmenue__grund {
+  max-width: 240px;
+  margin: 2px 10px 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-leise);
 }
