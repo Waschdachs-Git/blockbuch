@@ -40,7 +40,7 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 - Editor mit Überschriften, Listen, Checklisten, Tabellen (Spaltenbreite per Maus ziehbar) und
   Code-Blöcken mit Syntax-Hervorhebung
 - `/`-Menü zum Einfügen von Blöcken und Formatieren, alles auch ohne Maus bedienbar
-- Eingebaute Hilfe (⌘?, Menü „Hilfe“ oder „?“ in der Ordner-Leiste)
+- Eingebaute Hilfe (⌘ß, Menü „Hilfe“ oder „?“ in der Ordner-Leiste)
 - Kästen: `[!merke]`, `[!tipp]`, `[!achtung]`, `[!karten]` und `[!claude]` für Ergänzungen von Claude –
   per Klick aufs Etikett (oder ⌥⌘↩) ein- und ausklappbar, `> [!claude]-` startet eingeklappt
 - Schnellmarker im Unterricht: ⇧⌘U ❓ (nicht verstanden) und ⇧⌘L 🙋 (später nachfragen)
@@ -83,7 +83,7 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 | `/` | Block einfügen |
 | Tab / Esc | Wortvorschlag übernehmen / ausblenden |
 | ⌥⌘↩ | Kasten ein- und ausklappen |
-| ⌘? | Hilfe mit allen Kürzeln, Kästen und Claude-Befehlen |
+| ⌘ß | Hilfe mit allen Kürzeln, Kästen und Claude-Befehlen (die Taste mit dem „?“) |
 | Rechtsklick | Notiz umbenennen oder löschen, Ordner in den Papierkorb |
 | ⌘+ / ⌘− / ⌘0 | Ansicht vergrößern / verkleinern / zurücksetzen |
 | ← → ↑ ↓ | Zwischen Ordnern, Notizen und Editor wechseln |

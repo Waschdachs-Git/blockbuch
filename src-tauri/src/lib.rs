@@ -418,9 +418,10 @@ pub fn run() {
                 )
                 .build()?;
             let fenster = SubmenuBuilder::new(h, "Fenster").minimize().close_window().build()?;
-            // ⌘? fängt die Oberfläche selbst ab (auf deutscher Tastatur ⇧ß – als Menükürzel unzuverlässig)
+            // ⌘ß fängt die Oberfläche selbst ab (auf deutscher Tastatur liegt „?“ auf ⇧ß; ein Menükürzel
+            // wäre hier unzuverlässig, und macOS belegt ⌘? im Hilfe-Menü mit der Menüsuche)
             let hilfe = SubmenuBuilder::new(h, "Hilfe")
-                .item(&MenuItemBuilder::with_id("hilfe", "Blockbuch-Hilfe (⌘?)").build(h)?)
+                .item(&MenuItemBuilder::with_id("hilfe", "Blockbuch-Hilfe (⌘ß)").build(h)?)
                 .build()?;
             app.set_menu(
                 MenuBuilder::new(h)

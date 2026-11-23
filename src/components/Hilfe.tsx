@@ -1,4 +1,4 @@
-// Hilfe-Seite (⌘?, Menü „Hilfe“ oder „?“ unten in der Ordner-Leiste): alles Wichtige zum Nachlesen.
+// Hilfe-Seite (⌘ß bzw. ⌘?, Menü „Hilfe“ oder „?“ unten in der Ordner-Leiste): alles Wichtige zum Nachlesen.
 import { useEffect, useRef } from "react";
 import { fokusFangen } from "./Kontextmenue";
 
@@ -37,7 +37,7 @@ const KUERZEL: [abschnitt: string, Kuerzel[]][] = [
       ["⌘S", "Sofort sichern"],
       ["⇧⌘H", "Ältere Versionen der Notiz ansehen und zurückholen"],
       ["⌘+ / ⌘− / ⌘0", "Ansicht vergrößern / verkleinern / zurücksetzen"],
-      ["⌘?", "Diese Hilfe"],
+      ["⌘ß", "Diese Hilfe (die Taste mit dem „?“)"],
     ],
   ],
 ];

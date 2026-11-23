@@ -152,7 +152,7 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
             {sicherung}
           </div>
         )}
-        <button className="sidebar__hilfe" onClick={onHilfe} title="Hilfe (⌘?)" aria-label="Hilfe">
+        <button className="sidebar__hilfe" onClick={onHilfe} title="Hilfe (⌘ß)" aria-label="Hilfe">
           ?
         </button>
       </div>

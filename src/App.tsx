@@ -382,16 +382,19 @@ function App() {
     };
   }, []);
 
-  // ⌘? öffnet die Hilfe (auf deutscher Tastatur ⇧ß – deshalb über e.key statt als Menükürzel)
+  // ⌘ß öffnet die Hilfe – die Taste, auf der auf deutschen Tastaturen das „?“ steht (⌘? = ⌘⇧ß geht auch).
+  // In der Einfang-Phase, damit der Editor das „ß“ nicht als Text einfügt.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.metaKey && !e.ctrlKey && !e.altKey && e.key === "?" && !rueckfrageRef.current) {
+      if (!e.metaKey || e.ctrlKey || e.altKey || rueckfrageRef.current) return;
+      if (e.key === "?" || e.key === "ß" || e.key === "ẞ") {
         e.preventDefault();
+        e.stopPropagation();
         setHilfeOffen(true);
       }
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, []);
 
   // Nur in der Browser-Simulation (ohne Mac-Menü) die Kürzel selbst abfangen
