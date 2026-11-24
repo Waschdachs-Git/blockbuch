@@ -37,7 +37,8 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 ## Funktionen
 
 **Schreiben**
-- Editor mit Überschriften, Listen, Checklisten, Tabellen (Spaltenbreite per Maus ziehbar) und
+- Editor mit Überschriften, Listen, Checklisten, Tabellen (Leiste zum Einfügen/Löschen von Zeilen und
+  Spalten, Spaltenbreite per Maus ziehbar) und
   Code-Blöcken mit Syntax-Hervorhebung
 - `/`-Menü zum Einfügen von Blöcken und Formatieren, alles auch ohne Maus bedienbar
 - Eingebaute Hilfe (⌘ß, Menü „Hilfe“ oder „?“ in der Ordner-Leiste)
@@ -83,6 +84,7 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 | `/` | Block einfügen |
 | Tab / Esc | Wortvorschlag übernehmen / ausblenden |
 | ⌥⌘↩ | Kasten ein- und ausklappen |
+| ⌥⌘↓ / ⌥⌘→ | In Tabellen: Zeile darunter / Spalte rechts einfügen (↑ / ← davor) |
 | ⌘ß | Hilfe mit allen Kürzeln, Kästen und Claude-Befehlen (die Taste mit dem „?“) |
 | Rechtsklick | Notiz umbenennen oder löschen, Ordner in den Papierkorb |
 | ⌘+ / ⌘− / ⌘0 | Ansicht vergrößern / verkleinern / zurücksetzen |

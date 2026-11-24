@@ -6,8 +6,14 @@
 //   | ------- | --------- | -------- |
 //
 // Zahlen = Breite in Pixeln, 0 = automatisch. Ohne gezogene Breiten bleibt die Tabelle reines Markdown.
+//
+// Zeilen und Spalten: Steht der Cursor in einer Tabelle, erscheint darüber eine kleine Leiste
+// (+ Zeile, + Spalte, löschen). Tastatur: ⌥⌘↓/↑ Zeile darunter/darüber, ⌥⌘→/← Spalte rechts/links,
+// Tab in der letzten Zelle hängt eine Zeile an.
 import { Table } from "@tiptap/extension-table";
-import type { JSONContent, MarkdownToken } from "@tiptap/core";
+import type { Editor, JSONContent, MarkdownToken } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 
 const KOMMENTAR = /^<!--[ \t]*spalten:[ \t]*([\d. \t]*?)[ \t]*-->[ \t]*\r?\n/i;
 
@@ -26,7 +32,93 @@ function breitenAus(tabelle: JSONContent): number[] {
   });
 }
 
+/** Position der Tabelle, in der der Cursor steht – sonst null */
+function tabelleUmCursor(view: EditorView): number | null {
+  const { $from } = view.state.selection;
+  for (let d = $from.depth; d > 0; d--) if ($from.node(d).type.name === "table") return $from.before(d);
+  return null;
+}
+
+type LeistenKnopf = [text: string, titel: string, befehl: (e: Editor) => boolean, gefaehrlich?: boolean];
+
+const KNOEPFE: LeistenKnopf[] = [
+  ["+ Zeile", "Zeile darunter einfügen (⌥⌘↓)", (e) => e.chain().focus().addRowAfter().run()],
+  ["+ Spalte", "Spalte rechts einfügen (⌥⌘→)", (e) => e.chain().focus().addColumnAfter().run()],
+  ["− Zeile", "Diese Zeile löschen", (e) => e.chain().focus().deleteRow().run(), true],
+  ["− Spalte", "Diese Spalte löschen", (e) => e.chain().focus().deleteColumn().run(), true],
+  ["Tabelle löschen", "Ganze Tabelle löschen (⌘Z holt sie zurück)", (e) => e.chain().focus().deleteTable().run(), true],
+];
+
+/** Kleine Leiste über der Tabelle, in der der Cursor steht */
+function tabellenLeiste(editor: Editor) {
+  return new Plugin({
+    key: new PluginKey("tabellenLeiste"),
+    view(view) {
+      const leiste = document.createElement("div");
+      leiste.className = "tabellen-leiste";
+      leiste.setAttribute("role", "toolbar");
+      leiste.setAttribute("aria-label", "Tabelle bearbeiten");
+      leiste.hidden = true;
+      for (const [text, titel, befehl, gefaehrlich] of KNOEPFE) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = text;
+        b.title = titel;
+        b.tabIndex = -1;
+        if (gefaehrlich) b.className = "ist-gefaehrlich";
+        // mousedown verhindern: der Cursor bleibt in der Zelle
+        b.addEventListener("mousedown", (e) => e.preventDefault());
+        b.addEventListener("click", () => befehl(editor));
+        leiste.append(b);
+      }
+      view.dom.parentElement?.append(leiste);
+
+      const setzen = () => {
+        const pos = editor.isEditable ? tabelleUmCursor(view) : null;
+        const dom = pos === null ? null : (view.nodeDOM(pos) as HTMLElement | null);
+        if (!dom || !view.hasFocus()) {
+          leiste.hidden = true;
+          return;
+        }
+        // erst sichtbar machen – ausgeblendete Elemente haben kein offsetParent
+        leiste.hidden = false;
+        const basis = leiste.offsetParent as HTMLElement | null;
+        if (!basis) return;
+        const t = dom.getBoundingClientRect();
+        const b = basis.getBoundingClientRect();
+        leiste.style.top = `${t.top - b.top + basis.scrollTop - leiste.offsetHeight - 4}px`;
+        leiste.style.left = `${Math.max(0, t.right - b.left + basis.scrollLeft - leiste.offsetWidth)}px`;
+      };
+      const beiFokus = () => requestAnimationFrame(setzen);
+      view.dom.addEventListener("focus", beiFokus);
+      view.dom.addEventListener("blur", beiFokus);
+      return {
+        update: setzen,
+        destroy: () => {
+          view.dom.removeEventListener("focus", beiFokus);
+          view.dom.removeEventListener("blur", beiFokus);
+          leiste.remove();
+        },
+      };
+    },
+  });
+}
+
 export const TabelleMitBreiten = Table.extend({
+  addKeyboardShortcuts() {
+    return {
+      ...this.parent?.(),
+      "Mod-Alt-ArrowDown": () => this.editor.commands.addRowAfter(),
+      "Mod-Alt-ArrowUp": () => this.editor.commands.addRowBefore(),
+      "Mod-Alt-ArrowRight": () => this.editor.commands.addColumnAfter(),
+      "Mod-Alt-ArrowLeft": () => this.editor.commands.addColumnBefore(),
+    };
+  },
+
+  addProseMirrorPlugins() {
+    return [...(this.parent?.() ?? []), tabellenLeiste(this.editor)];
+  },
+
   markdownTokenizer: {
     ...basisTokenizer,
     start: (src: string) => {
@@ -67,4 +159,5 @@ export const TabelleMitBreiten = Table.extend({
     if (!breiten.some((b) => b > 0)) return md;
     return `\n<!-- spalten: ${breiten.join(" ")} -->${md.startsWith("\n") ? md : `\n${md}`}`;
   },
-}).configure({ resizable: true, cellMinWidth: 60 });
+  // breiterer Greifbereich am Spaltenrand – leichter zu treffen
+}).configure({ resizable: true, cellMinWidth: 60, handleWidth: 8 });

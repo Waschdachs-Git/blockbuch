@@ -144,11 +144,29 @@ export function Hilfe({ onSchliessen }: { onSchliessen: () => void }) {
             <h3>Bilder, PDFs und Grafiken</h3>
             <p>
               Ziehe Bilder oder PDFs in die Notiz oder füge sie mit{" "}
-              <kbd>⌘V</kbd> ein – auch Screenshots und Fotos vom iPhone
-              (Rechtsklick → „Von iPhone importieren“). Bei PDFs erscheinen die
-              Knöpfe, wenn du mit der Maus darüberfährst. Tabellenspalten ziehst
-              du am Spaltenrand breiter oder schmaler.
+              <kbd>⌘V</kbd> ein – auch Screenshots. Fotos vom iPhone (Tafelbild):
+              Auf dem iPhone das Foto öffnen, „Kopieren“ tippen, dann am Mac{" "}
+              <kbd>⌘V</kbd> (geht mit derselben Apple-ID automatisch) – oder per
+              AirDrop schicken und hineinziehen. Bei PDFs erscheinen die Knöpfe,
+              wenn du mit der Maus darüberfährst.
             </p>
+          </section>
+
+          <section>
+            <h3>Tabellen</h3>
+            <p>
+              Steht der Cursor in einer Tabelle, erscheint darüber eine kleine
+              Leiste: Zeilen und Spalten einfügen oder löschen. Tab springt zur
+              nächsten Zelle – in der letzten Zelle entsteht eine neue Zeile.
+              Spalten ziehst du am Spaltenrand breiter oder schmaler.
+            </p>
+            <Tabelle
+              zeilen={[
+                ["⌥⌘↓ / ⌥⌘↑", "Zeile darunter / darüber einfügen"],
+                ["⌥⌘→ / ⌥⌘←", "Spalte rechts / links einfügen"],
+                ["Tab / ⇧Tab", "Nächste / vorige Zelle"],
+              ]}
+            />
           </section>
 
           <section>

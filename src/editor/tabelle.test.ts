@@ -74,4 +74,25 @@ describe("Tabellen mit Spaltenbreiten", () => {
     expect(zurueck).toContain("Danach");
     expect(wuerdeInhaltVerlieren(md, zurueck)).toBe(false);
   });
+
+  it("⌥⌘↓ / ⌥⌘→ fügen Zeile und Spalte ein", () => {
+    laden(OHNE);
+    editor.commands.setTextSelection(4); // in der ersten Zelle
+    const mac = /Mac/.test(navigator.platform);
+    const taste = (key: string) =>
+      editor.view.someProp("handleKeyDown", (f) => f(editor.view, new KeyboardEvent("keydown", { key, metaKey: mac, ctrlKey: !mac, altKey: true })));
+    expect(taste("ArrowDown")).toBe(true);
+    expect(taste("ArrowRight")).toBe(true);
+    const tabelle = editor.state.doc.firstChild!;
+    expect(tabelle.childCount).toBe(3); // Kopf + neue Zeile + PK
+    expect(tabelle.firstChild!.childCount).toBe(3);
+  });
+
+  it("Spalte löschen passt die gespeicherten Breiten an", () => {
+    laden("<!-- spalten: 160 240 -->\n" + OHNE);
+    editor.commands.setTextSelection(4);
+    editor.commands.deleteColumn();
+    expect(speichern()).toMatch(/^<!-- spalten: 240 -->\n\| Erklärung/);
+  });
 });
+

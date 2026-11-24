@@ -425,6 +425,7 @@ button {
 }
 
 .editor__flaeche {
+  position: relative; /* Bezug für die Tabellen-Leiste */
   flex: 1;
   overflow-y: auto;
   cursor: text;
@@ -1742,4 +1743,41 @@ button {
   font-size: 11px;
   line-height: 1.4;
   color: var(--text-leise);
+}
+
+/* Leiste über der Tabelle mit dem Cursor (tabelle.ts) */
+.tabellen-leiste {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--linie);
+  border-radius: 7px;
+  background: var(--bg);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  font-size: 11px;
+}
+
+.tabellen-leiste[hidden] {
+  display: none;
+}
+
+.tabellen-leiste button {
+  padding: 2px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-leise);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tabellen-leiste button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.tabellen-leiste button.ist-gefaehrlich:hover {
+  color: #c4314b;
 }
