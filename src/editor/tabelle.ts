@@ -86,17 +86,37 @@ function tabellenLeiste(editor: Editor) {
         if (!basis) return;
         const t = dom.getBoundingClientRect();
         const b = basis.getBoundingClientRect();
-        leiste.style.top = `${t.top - b.top + basis.scrollTop - leiste.offsetHeight - 4}px`;
+        const hoehe = leiste.offsetHeight;
+        const tabelleOben = t.top - b.top + basis.scrollTop;
+        const tabelleUnten = t.bottom - b.top + basis.scrollTop;
+        // Am liebsten über der Tabelle. Ist dort kein Platz (Tabelle ganz oben in der Notiz) oder ist der
+        // Tabellenanfang weggescrollt: oben rechts im sichtbaren Teil der Tabelle – nie außerhalb des Bilds
+        const sichtbarOben = basis.scrollTop + 4;
+        const oben = Math.min(Math.max(tabelleOben - hoehe - 4, sichtbarOben), tabelleUnten - hoehe);
+        leiste.style.top = `${Math.max(0, oben)}px`;
         leiste.style.left = `${Math.max(0, t.right - b.left + basis.scrollLeft - leiste.offsetWidth)}px`;
       };
       const beiFokus = () => requestAnimationFrame(setzen);
       view.dom.addEventListener("focus", beiFokus);
       view.dom.addEventListener("blur", beiFokus);
+      // Beim Scrollen mitwandern (der scrollende Bereich ist das offsetParent der Leiste)
+      let scrollBereich: HTMLElement | null = null;
+      const beiScroll = () => {
+        if (!leiste.hidden) setzen();
+      };
+      requestAnimationFrame(() => {
+        leiste.hidden = false;
+        scrollBereich = leiste.offsetParent as HTMLElement | null;
+        leiste.hidden = true;
+        scrollBereich?.addEventListener("scroll", beiScroll, { passive: true });
+        setzen();
+      });
       return {
         update: setzen,
         destroy: () => {
           view.dom.removeEventListener("focus", beiFokus);
           view.dom.removeEventListener("blur", beiFokus);
+          scrollBereich?.removeEventListener("scroll", beiScroll);
           leiste.remove();
         },
       };
