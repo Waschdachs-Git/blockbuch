@@ -37,6 +37,7 @@ const KUERZEL: [abschnitt: string, Kuerzel[]][] = [
       ["⌘S", "Sofort sichern"],
       ["⌘P", "Notiz drucken oder als PDF sichern (im Druckdialog unten links)"],
       ["⇧⌘K", "Karteikarten des Ordners lernen"],
+      ["⇧⌘P", "LK-Planer: Leistungskontrollen eintragen, Lernplan abhaken"],
       ["⇧⌘H", "Ältere Versionen der Notiz ansehen und zurückholen"],
       ["⌘+ / ⌘− / ⌘0", "Ansicht vergrößern / verkleinern / zurücksetzen"],
       ["⌘ß", "Diese Hilfe (die Taste mit dem „?“)"],
@@ -58,6 +59,7 @@ const CLAUDE: Kuerzel[] = [
     "/rechtschreibung",
     "Nur die Rechtschreibung korrigieren – mit Liste der Änderungen",
   ],
+  ["/lk", "Probe-LK zur nächsten eingetragenen LK – mit eingeklappten Lösungen"],
 ];
 
 export function Hilfe({ onSchliessen }: { onSchliessen: () => void }) {
@@ -151,6 +153,16 @@ export function Hilfe({ onSchliessen }: { onSchliessen: () => void }) {
               <kbd>⌘V</kbd> (geht mit derselben Apple-ID automatisch) – oder per
               AirDrop schicken und hineinziehen. Bei PDFs erscheinen die Knöpfe,
               wenn du mit der Maus darüberfährst.
+            </p>
+          </section>
+
+          <section>
+            <h3>LK-Planer</h3>
+            <p>
+              Trag deine Leistungskontrollen ein (⇧⌘P, „📅“ unten links oder Rechtsklick auf einen Ordner →
+              „LK eintragen …“): Datum aus Untis, Lernfeld, Thema. Blockbuch verteilt den Stoff bis zum Vortag
+              auf die Tage – jeden Tag ein paar Notizen und Karteikarten, am letzten Tag Wiederholung und eine
+              Probe-LK von Claude (<code>/lk</code>). Hakst du etwas ab, wird der Rest neu verteilt.
             </p>
           </section>
 

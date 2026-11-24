@@ -145,31 +145,69 @@ pub fn karten_sammeln(root: &Path, ordner: Option<&str>) -> Vec<Karte> {
     alle
 }
 
-/// Lernstand als JSON-Text (noch keiner: "{}"). Ist die Datei da, aber unlesbar oder kaputt, gibt es
-/// einen Fehler – sonst würde die nächste Bewertung allen Lernfortschritt mit „leer“ überschreiben.
-pub fn lernstand_lesen(root: &Path) -> Result<String, String> {
-    let pfad = root.join(LERNSTAND);
+/// LK-Planer: eingetragene Leistungskontrollen und was davon erledigt ist
+pub const LKS: &str = ".blockbuch/lks.json";
+
+/// JSON-Datei in .blockbuch lesen (noch keine: "{}"); unlesbar/kaputt → Fehler (nie still leer)
+fn json_lesen(root: &Path, datei: &str, was: &str) -> Result<String, String> {
+    let pfad = root.join(datei);
     if !pfad.exists() {
         return Ok("{}".into());
     }
-    let text = fs::read_to_string(&pfad).map_err(|e| format!("Der Lernstand der Karteikarten lässt sich nicht lesen: {e}"))?;
+    let text = fs::read_to_string(&pfad).map_err(|e| format!("{was} lässt sich nicht lesen: {e}"))?;
     serde_json::from_str::<serde_json::Value>(&text).map_err(|_| {
-        "Der Lernstand der Karteikarten (~/Schule/.blockbuch/lernstand.json) ist beschädigt. Blockbuch \
-         überschreibt ihn nicht – eine ältere Fassung steckt in der Sicherung (Claude kann sie mit git \
-         wiederherstellen)."
-            .to_string()
+        format!("{was} (~/Schule/{datei}) ist beschädigt. Blockbuch überschreibt die Datei nicht – eine ältere Fassung steckt in der Sicherung.")
     })?;
     Ok(text)
 }
 
-/// Lernstand speichern – nur gültiges JSON, atomar (nie eine halbe Datei)
-pub fn lernstand_schreiben(root: &Path, inhalt: &str) -> Result<(), String> {
-    serde_json::from_str::<serde_json::Value>(inhalt).map_err(|e| format!("Ungültiger Lernstand: {e}"))?;
-    let pfad = root.join(LERNSTAND);
+fn json_schreiben(root: &Path, datei: &str, inhalt: &str) -> Result<(), String> {
+    serde_json::from_str::<serde_json::Value>(inhalt).map_err(|e| format!("Ungültige Daten: {e}"))?;
+    let pfad = root.join(datei);
     if let Some(dir) = pfad.parent() {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
     schreibe_atomar(&pfad, inhalt, None).map(|_| ())
+}
+
+/// Notizen eines Ordners (mit Unterordnern), die `text` enthalten – z. B. "❓" für den LK-Planer.
+/// Ergebnis: "Ordner/Datei.md"
+pub fn notizen_mit(root: &Path, ordner: &str, text: &str) -> Vec<String> {
+    let mut treffer = Vec::new();
+    for o in alle_ordner(root).unwrap_or_default() {
+        if o != ordner && !o.starts_with(&format!("{ordner}/")) {
+            continue;
+        }
+        for e in fs::read_dir(root.join(&o)).into_iter().flatten().flatten() {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if !name.ends_with(".md") || name.starts_with('.') {
+                continue;
+            }
+            if fs::read_to_string(e.path()).is_ok_and(|t| t.contains(text)) {
+                treffer.push(format!("{o}/{name}"));
+            }
+        }
+    }
+    treffer
+}
+
+pub fn lks_lesen(root: &Path) -> Result<String, String> {
+    json_lesen(root, LKS, "Der LK-Planer")
+}
+
+pub fn lks_schreiben(root: &Path, inhalt: &str) -> Result<(), String> {
+    json_schreiben(root, LKS, inhalt)
+}
+
+/// Lernstand als JSON-Text (noch keiner: "{}"). Ist die Datei da, aber unlesbar oder kaputt, gibt es
+/// einen Fehler – sonst würde die nächste Bewertung allen Lernfortschritt mit „leer“ überschreiben.
+pub fn lernstand_lesen(root: &Path) -> Result<String, String> {
+    json_lesen(root, LERNSTAND, "Der Lernstand der Karteikarten")
+}
+
+/// Lernstand speichern – nur gültiges JSON, atomar (nie eine halbe Datei)
+pub fn lernstand_schreiben(root: &Path, inhalt: &str) -> Result<(), String> {
+    json_schreiben(root, LERNSTAND, inhalt)
 }
 
 #[cfg(test)]
@@ -237,5 +275,16 @@ mod tests {
         // kaputte Datei: Fehler statt "leer"
         fs::write(root.join(LERNSTAND), "{kaputt").unwrap();
         assert!(lernstand_lesen(root).is_err());
+        // LK-Planer: gleiche Regeln
+        assert_eq!(lks_lesen(root).unwrap(), "{}");
+        lks_schreiben(root, r#"{"lks":[]}"#).unwrap();
+        assert_eq!(lks_lesen(root).unwrap(), r#"{"lks":[]}"#);
+        assert!(lks_schreiben(root, "nein").is_err());
+        fs::write(root.join(LKS), "{kaputt").unwrap();
+        assert!(lks_lesen(root).is_err(), "kaputter LK-Planer wird nicht als leer gelesen");
+        // ❓ nur im gewünschten Ordner (mit Unterordnern)
+        fs::write(root.join("LF5/Unicode/2026-10-04-Q.md"), "# Q\nUnklar ❓\n").unwrap();
+        fs::write(root.join("Deutsch/2026-10-05-R.md"), "# R\nAuch ❓\n").unwrap();
+        assert_eq!(notizen_mit(root, "LF5", "❓"), vec!["LF5/Unicode/2026-10-04-Q.md"]);
     }
 }

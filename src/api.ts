@@ -71,6 +71,11 @@ export const api = {
   kartenSammeln: (ordner: string | null) => invoke<Karte[]>("karten_sammeln", { ordner }),
   lernstandLesen: () => invoke<string>("lernstand_lesen"),
   lernstandSchreiben: (inhalt: string) => invoke<void>("lernstand_schreiben", { inhalt }),
+  /** LK-Planer (~/Schule/.blockbuch/lks.json) */
+  lksLesen: () => invoke<string>("lks_lesen"),
+  lksSchreiben: (inhalt: string) => invoke<void>("lks_schreiben", { inhalt }),
+  /** Notizen eines Ordners (mit Unterordnern), die `text` enthalten – "Ordner/Datei.md" */
+  notizenMit: (ordner: string, text: string) => invoke<string[]>("notizen_mit", { ordner, text }),
   /** Notizen und übrige Dateien (assets/, Unterordner) in einem Ordner */
   ordnerInhalt: (ordner: string) => invoke<{ notizen: number; dateien: number }>("ordner_inhalt", { ordner }),
 };

@@ -23,6 +23,10 @@ type Props = {
   /** fällige Karteikarten in einem Ordner (mit Unterordnern); null = alle */
   faellig: (ordner: string | null) => number;
   onLernen: () => void;
+  /** z. B. "LK in 3 Tagen" – null, wenn keine LK eingetragen ist */
+  naechsteLk: string | null;
+  naechsteLkTitel: string;
+  onLkPlaner: () => void;
   /** Hinweis unten, z. B. "Gesichert heute, 10:42" */
   sicherung: string | null;
   /** Zusatzinfo als Tooltip (z. B. nicht mitgesicherte Projektordner) */
@@ -46,6 +50,9 @@ export function Sidebar({
   onNotizAblegen,
   faellig,
   onLernen,
+  naechsteLk,
+  naechsteLkTitel,
+  onLkPlaner,
   sicherung,
   sicherungHinweis,
 }: Props) {
@@ -221,6 +228,9 @@ export function Sidebar({
             {sicherung}
           </div>
         )}
+        <button className="sidebar__lernen" onClick={onLkPlaner} title={naechsteLkTitel}>
+          📅 {naechsteLk ?? "LK"}
+        </button>
         <button className="sidebar__lernen" onClick={onLernen} title="Karteikarten aus allen Ordnern lernen">
           🗂 Lernen{faellig(null) > 0 ? ` (${faellig(null)})` : ""}
         </button>

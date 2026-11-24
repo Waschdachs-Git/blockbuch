@@ -28,6 +28,7 @@ const slug = (t: string) =>
     .replace(/^-|-$/g, "") || "Notiz";
 
 let lernstand = "{}";
+let lks = "{}";
 const info = (datei: string, c: string) => ({
   datei,
   titel: /^# (.*)$/m.exec(c)?.[1] ?? datei,
@@ -225,6 +226,19 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
       }
       return karten;
     }
+    case "notizen_mit": {
+      const treffer = [];
+      for (const [o, dateien] of Object.entries(fs)) {
+        if (o !== a.ordner && !o.startsWith(`${a.ordner}/`)) continue;
+        for (const [d, inhalt] of Object.entries(dateien)) if (d.endsWith(".md") && !d.includes("/") && inhalt.includes(a.text)) treffer.push(`${o}/${d}`);
+      }
+      return treffer;
+    }
+    case "lks_lesen":
+      return lks;
+    case "lks_schreiben":
+      lks = a.inhalt;
+      return null;
     case "lernstand_lesen":
       return lernstand;
     case "lernstand_schreiben":

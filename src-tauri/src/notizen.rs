@@ -253,7 +253,10 @@ pub fn lies_info(pfad: &Path) -> Ergebnis<NotizInfo> {
 pub fn schreibe_atomar(pfad: &Path, inhalt: &str, erwartet: Option<u64>) -> Ergebnis<u64> {
     let ordner = pfad.parent().ok_or("Ungültiger Pfad")?;
     let name = pfad.file_name().and_then(|n| n.to_str()).ok_or("Ungültiger Pfad")?;
-    let tmp = ordner.join(format!(".{name}.{}.blockbuch-tmp", std::process::id()));
+    // eigene Temp-Datei je Aufruf: zwei gleichzeitige Speicherungen dürfen sich nicht gegenseitig leeren
+    static ZAEHLER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let nr = ZAEHLER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = ordner.join(format!(".{name}.{}-{nr}.blockbuch-tmp", std::process::id()));
     let ergebnis = (|| {
         let mut f = fs::File::create(&tmp).map_err(fehler)?;
         f.write_all(inhalt.as_bytes()).map_err(fehler)?;
@@ -333,6 +336,7 @@ const VORLAGEN: &[(&str, &str, bool)] = &[
     (".claude/commands/korrigieren.md", include_str!("../vorlagen/commands/korrigieren.md"), true),
     (".claude/commands/grafik.md", include_str!("../vorlagen/commands/grafik.md"), true),
     (".claude/commands/rechtschreibung.md", include_str!("../vorlagen/commands/rechtschreibung.md"), true),
+    (".claude/commands/lk.md", include_str!("../vorlagen/commands/lk.md"), true),
 ];
 
 /// Hier merkt sich die App, welche Vorlagen-Fassung sie selbst geschrieben hat

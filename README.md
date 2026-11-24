@@ -69,6 +69,8 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 - Karteikarten aus den `[!karten]`-Kästen (`Frage :: Antwort`, z. B. von Claude mit `/karten`), verteiltes
   Wiederholen wie bei Anki: 1 Nochmal · 2 Schwer · 3 Gut · 4 Leicht; Vorlesen per 🔊
 - Fällige Karten als Zahl neben jedem Ordner; Lernstand in `~/Schule/.blockbuch/lernstand.json`
+- LK-Planer: Leistungskontrollen eintragen, Blockbuch verteilt den Stoff bis zum Vortag (Notizen,
+  Karteikarten, Wiederholung); `/lk` lässt Claude eine Probe-LK mit eingeklappten Lösungen schreiben
 
 **Ordnen und Exportieren**
 - Unterordner in Lernfeldern und Fächern (z. B. `LF5/Unicode`), Notizen per Rechtsklick verschieben –
@@ -90,6 +92,7 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 | ⌘S | Jetzt sichern |
 | ⌘P | Drucken / als PDF sichern |
 | ⇧⌘K | Karteikarten lernen (Leertaste: Antwort, 1–4: bewerten) |
+| ⇧⌘P | LK-Planer |
 | ⇧⌘H | Versionen der Notiz |
 | ⌥⌘S | Ordner-Leiste ein/aus |
 | ⇧⌘U / ⇧⌘L | Marker ❓ / 🙋 |
@@ -115,6 +118,7 @@ In `~/Schule` legt Blockbuch Vorlagen für Claude an:
 | `/korrigieren` | Antworten auf Übungsfragen bewerten wie die IHK, mit Teilpunkten |
 | `/woche` | Wochenrückblick: Berichtsheft-Text, offene Fragen, Lernaufträge |
 | `/grafik` | Animierte, interaktive Grafik bauen und in die Notiz einfügen |
+| `/lk` | Probe-LK zur nächsten eingetragenen Leistungskontrolle, Lösungen eingeklappt |
 | `/rechtschreibung` | Nur die Rechtschreibung der Mitschrift korrigieren (Hilfe bei LRS), mit Liste der Änderungen |
 
 ## Technik

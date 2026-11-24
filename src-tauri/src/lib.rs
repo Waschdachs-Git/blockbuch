@@ -288,6 +288,22 @@ async fn lernstand_lesen(app: tauri::AppHandle) -> Ergebnis<String> {
     kartei::lernstand_lesen(&schule_pfad(&app)?)
 }
 
+/// Notizen eines Ordners (mit Unterordnern), die einen Text enthalten (LK-Planer: "❓")
+#[tauri::command]
+async fn notizen_mit(app: tauri::AppHandle, ordner: String, text: String) -> Ergebnis<Vec<String>> {
+    Ok(kartei::notizen_mit(&schule_pfad(&app)?, &ordner, &text))
+}
+
+#[tauri::command]
+async fn lks_lesen(app: tauri::AppHandle) -> Ergebnis<String> {
+    kartei::lks_lesen(&schule_pfad(&app)?)
+}
+
+#[tauri::command]
+async fn lks_schreiben(app: tauri::AppHandle, inhalt: String) -> Ergebnis<()> {
+    kartei::lks_schreiben(&schule_pfad(&app)?, &inhalt)
+}
+
 #[tauri::command]
 async fn lernstand_schreiben(app: tauri::AppHandle, inhalt: String) -> Ergebnis<()> {
     kartei::lernstand_schreiben(&schule_pfad(&app)?, &inhalt)
@@ -381,7 +397,10 @@ pub fn run() {
             notiz_verschieben,
             karten_sammeln,
             lernstand_lesen,
-            lernstand_schreiben
+            lernstand_schreiben,
+            lks_lesen,
+            lks_schreiben,
+            notizen_mit
         ])
         // Eigenes Menü: ⌘Q läuft über "beenden_anfragen" statt macOS direkt beenden zu lassen
         // (das Standard-"Beenden" schließt die App sofort, ohne dass die Oberfläche speichern kann)
@@ -447,6 +466,11 @@ pub fn run() {
                 .item(
                     &MenuItemBuilder::with_id("karten", "Karteikarten lernen")
                         .accelerator("CmdOrCtrl+Shift+K")
+                        .build(h)?,
+                )
+                .item(
+                    &MenuItemBuilder::with_id("lk-planer", "LK-Planer")
+                        .accelerator("CmdOrCtrl+Shift+P")
                         .build(h)?,
                 )
                 .item(

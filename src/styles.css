@@ -1353,14 +1353,15 @@ button {
 .sidebar__fuss {
   flex: none;
   display: flex;
+  flex-wrap: wrap; /* Sicherungszeile oben, Knöpfe darunter */
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
   padding: 6px 10px 8px 18px;
   border-top: 1px solid var(--linie);
 }
 
 .sidebar__sicherung {
-  flex: 1;
+  flex: 1 1 100%;
   min-width: 0;
   overflow: hidden;
   font-size: 11px;
@@ -2182,4 +2183,277 @@ button {
 .sidebar__lernen:hover {
   color: var(--text);
   background: var(--bg-hover);
+}
+
+/* ---------- LK-Planer (lk/LkPlaner.tsx) ---------- */
+
+.lk {
+  width: min(900px, 100%);
+  height: min(640px, 82vh);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--linie);
+  border-radius: 14px;
+  background: var(--bg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  outline: none;
+}
+
+.lk__kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px 22px;
+  border-bottom: 1px solid var(--linie);
+}
+
+.lk__kopf h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.lk__inhalt {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 0;
+}
+
+.lk__liste {
+  padding: 12px;
+  border-right: 1px solid var(--linie);
+  background: var(--bg-liste);
+  overflow-y: auto;
+}
+
+.lk__liste ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lk__neu {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px dashed var(--akzent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--akzent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lk__eintrag {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lk__eintrag:hover {
+  background: var(--bg-hover);
+}
+
+.lk__eintrag.ist-aktiv {
+  background: var(--bg-aktiv);
+}
+
+.lk__eintrag.ist-vorbei {
+  opacity: 0.6;
+}
+
+.lk__eintrag-titel {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lk__eintrag-info {
+  font-size: 11.5px;
+  color: var(--text-leise);
+}
+
+.lk__vergangen {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-leise);
+}
+
+.lk__vergangen summary {
+  cursor: pointer;
+}
+
+.lk__plan {
+  padding: 16px 22px 22px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.lk__plan h3 {
+  margin: 0 0 2px;
+  font-size: 17px;
+}
+
+.lk__plan-kopf {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.lk__aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.lk__hinweis {
+  margin: 0;
+  color: var(--text-leise);
+}
+
+.lk__fortschritt {
+  position: relative;
+  height: 20px;
+  margin: 4px 0 14px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+
+.lk__fortschritt div {
+  height: 100%;
+  background: var(--akzent);
+  opacity: 0.35;
+}
+
+.lk__fortschritt span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lk__tage {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lk__tage > li {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+}
+
+.lk__tage > li.ist-heute {
+  border-color: var(--akzent);
+  box-shadow: 0 0 0 1px var(--akzent);
+}
+
+.lk__tage h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--akzent);
+}
+
+.lk__tage ul,
+.lk__vergangen ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lk__tage li li,
+.lk__vergangen li {
+  padding: 2px 0;
+}
+
+.lk__plan label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ist-erledigt span,
+.ist-erledigt .lk__link {
+  text-decoration: line-through;
+  color: var(--text-leise);
+}
+
+.lk__link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--linie);
+  text-underline-offset: 3px;
+}
+
+.lk__link:hover {
+  color: var(--akzent);
+}
+
+.lk__formular {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.lk__formular label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.lk__formular input,
+.lk__formular select {
+  padding: 6px 8px;
+  border: 1px solid var(--linie);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: normal;
+}
+
+.lk__optional {
+  font-weight: normal;
+  color: var(--text-leise);
+}
+
+.lk__knoepfe {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.knopf--primaer {
+  border-color: var(--akzent);
+  background: var(--akzent);
+  color: #fff;
 }

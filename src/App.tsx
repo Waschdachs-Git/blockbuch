@@ -8,6 +8,8 @@ import { Suche } from "./components/Suche";
 import { Versionen, zeitAnzeigen } from "./components/Versionen";
 import { Hilfe } from "./components/Hilfe";
 import { Kartei } from "./karten/Kartei";
+import { LkPlaner } from "./lk/LkPlaner";
+import { abstandText, heuteText, lksAusText, tageZwischen, type LkDatei } from "./lk/plan";
 import { lernstandAusText } from "./karten/planer";
 import { faelligAnzeige, faelligJeOrdner, type Faellig } from "./karten/sitzung";
 import { Kontextmenue, Rueckfrage, type MenueEintrag } from "./components/Kontextmenue";
@@ -34,12 +36,35 @@ function App() {
   // Karteikarten: offene Lernsitzung (ordner null = alle) und fällige Karten je Ordner
   const [kartei, setKartei] = useState<{ ordner: string | null; titel: string } | null>(null);
   const [faellig, setFaellig] = useState<Faellig | null>(null);
+  // LK-Planer: offen (mit Ordner, für den gleich eine LK eingetragen wird) und die eingetragenen LKs
+  const [lkPlaner, setLkPlaner] = useState<{ vorauswahl?: string } | null>(null);
+  const [lks, setLks] = useState<LkDatei | null>(null);
+  useEffect(() => {
+    api.lksLesen().then((t) => setLks(lksAusText(t))).catch(() => {});
+  }, []);
+  // „heute“ als Zustand: bleibt die App über Mitternacht offen, stimmt „LK in N Tagen“ trotzdem
+  const [heuteDatum, setHeuteDatum] = useState(heuteText);
+  useEffect(() => {
+    const pruefen = () => setHeuteDatum(heuteText());
+    const zeit = window.setInterval(pruefen, 60_000);
+    window.addEventListener("focus", pruefen);
+    return () => {
+      window.clearInterval(zeit);
+      window.removeEventListener("focus", pruefen);
+    };
+  }, []);
+  const naechsteLk = useMemo(
+    () => [...(lks?.lks ?? [])].filter((l) => l.datum >= heuteDatum).sort((a, b) => a.datum.localeCompare(b.datum))[0] ?? null,
+    [lks, heuteDatum],
+  );
   // nr: jedes Menü neu aufbauen (Untermenü „Verschieben nach …“ an derselben Stelle: Fokus und Position neu)
   const [menue, setMenueZustand] = useState<{ nr: number; x: number; y: number; eintraege: MenueEintrag[] } | null>(null);
   const menueNr = useRef(0);
   const setMenue = (m: { x: number; y: number; eintraege: MenueEintrag[] }) => setMenueZustand({ ...m, nr: ++menueNr.current });
   const [rueckfrage, setRueckfrage] = useState<{ titel: string; text: string; ja: string; onJa: () => void } | null>(null);
   const menueSchliessen = useCallback(() => setMenueZustand(null), []);
+  const lkPlanerRef = useRef(lkPlaner);
+  lkPlanerRef.current = lkPlaner;
   const karteiRef = useRef(kartei);
   karteiRef.current = kartei;
   const rueckfrageRef = useRef(rueckfrage);
@@ -58,7 +83,7 @@ function App() {
   const aktuellerOrdnerRef = useRef<string | null>(null);
 
   const { lernfelder, faecher } = useMemo(() => ordnerAusNamen(ordnerNamen ?? []), [ordnerNamen]);
-  const alleOrdner = [...lernfelder, ...faecher];
+  const alleOrdner = useMemo(() => [...lernfelder, ...faecher], [lernfelder, faecher]);
   // Ist der gemerkte Unterordner verschwunden (gelöscht, von außen umbenannt): zum Ordner darüber
   const ordner =
     alleOrdner.find((o) => o.name === aktiverOrdner) ??
@@ -151,6 +176,7 @@ function App() {
   }, [faelligZaehlen]);
   /** fällige Karten eines Ordners einschließlich seiner Unterordner */
   const faelligIn = (name: string | null) => (faellig ? faelligAnzeige(faellig, name) : 0);
+  const lkPlanerSchliessen = useCallback(() => setLkPlaner(null), []);
   const karteiSchliessen = useCallback(() => {
     setKartei(null);
     faelligZaehlen();
@@ -409,6 +435,7 @@ function App() {
                 aktion: () => setKartei({ ordner: name, titel: alleOrdner.find((o) => o.name === name)?.titel ?? name }),
               },
             ]),
+        ...(name === "Claude" || name === "Gerettet" ? [] : [{ titel: "LK eintragen …", aktion: () => setLkPlaner({ vorauswahl: name }) }]),
         { titel: "Ordner als PDF / drucken …", aktion: () => druckeOrdner(name) },
         {
           titel: name.includes("/") ? "Unterordner in den Papierkorb …" : "Ordner in den Papierkorb …",
@@ -515,13 +542,14 @@ function App() {
   const menueRef = useRef<(id: string) => void>(() => {});
   menueRef.current = (id) => {
     // Solange eine Rückfrage oder das Lernen offen ist, keine Menübefehle (⌘N, ⌘K …) dahinter ausführen
-    if (rueckfrageRef.current || karteiRef.current) return;
+    if (rueckfrageRef.current || karteiRef.current || lkPlanerRef.current) return;
     if (id === "neue-notiz") neueNotiz();
     if (id === "ordner-leiste") toggleSidebar();
     if (id === "suchen") setSucheOffen(true);
     if (id === "versionen" && aktiveDatei) setVersionenOffen(true);
     if (id === "sichern") jetztSichern();
     if (id === "hilfe") setHilfeOffen(true);
+    if (id === "lk-planer") setLkPlaner({});
     if (id === "karten") setKartei(ordner ? { ordner: ordner.name, titel: ordner.titel } : { ordner: null, titel: "alle Ordner" });
     if (id === "drucken" && ordner && aktiveDatei) druckeNotizen([{ ordner: ordner.name, datei: aktiveDatei }]);
   };
@@ -629,6 +657,9 @@ function App() {
         onNotizAblegen={(von, datei, ziel) => verschieben(von, datei, ziel)}
         faellig={faelligIn}
         onLernen={() => setKartei({ ordner: null, titel: "alle Ordner" })}
+        naechsteLk={naechsteLk ? `LK ${abstandText(tageZwischen(heuteDatum, naechsteLk.datum))}` : null}
+        naechsteLkTitel={naechsteLk ? `${naechsteLk.thema || (alleOrdner.find((o) => o.name === naechsteLk.ordner)?.titel ?? naechsteLk.ordner)} am ${naechsteLk.datum.split("-").reverse().join(".")} – LK-Planer öffnen (⇧⌘P)` : "LK-Planer (⇧⌘P)"}
+        onLkPlaner={() => setLkPlaner({})}
         onUnterordnerAbbrechen={() => {
           setUnterordnerFuer(null);
           requestAnimationFrame(fokusSidebar);
@@ -693,6 +724,25 @@ function App() {
         />
       )}
       {hilfeOffen && <Hilfe onSchliessen={() => setHilfeOffen(false)} />}
+      {lkPlaner && (
+        <LkPlaner
+          ordnerListe={alleOrdner}
+          vorauswahl={lkPlaner.vorauswahl}
+          onNotizOeffnen={(o, d) => {
+            setLkPlaner(null);
+            if (o !== ordner?.name) {
+              auswahlNachOrdnerwechsel.current = d;
+              setAktiverOrdner(o);
+            } else {
+              setAktiveDatei(d);
+            }
+          }}
+          onKartenLernen={(o, titel) => setKartei({ ordner: o, titel })}
+          onGeaendert={setLks}
+          onSchliessen={lkPlanerSchliessen}
+          onFehler={melde}
+        />
+      )}
       {kartei && <Kartei ordner={kartei.ordner} titel={kartei.titel} onSchliessen={karteiSchliessen} onFehler={melde} />}
       {menue && <Kontextmenue key={menue.nr} x={menue.x} y={menue.y} eintraege={menue.eintraege} onSchliessen={menueSchliessen} />}
       {rueckfrage && (
