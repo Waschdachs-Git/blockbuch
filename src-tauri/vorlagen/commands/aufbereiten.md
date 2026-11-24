@@ -4,7 +4,7 @@ argument-hint: "[Notiz oder Ordner, leer = heutige Notizen]"
 ---
 
 Bereite Mitschriften auf. Ziel: $ARGUMENTS
-(Ist das leer, nimm alle Notizen, deren `datum` heute ist – in allen Ordnern außer `Gerettet/`.)
+(Ist das leer, nimm alle Notizen, deren `datum` heute ist – in allen Ordnern und Unterordnern außer `Gerettet/`.)
 
 Beachte strikt die Regeln aus `Claude/CLAUDE.md` – vor allem: **die Mitschrift des Nutzers nicht verändern**,
 Ergänzungen nur in `> [!claude]`-Kästen.

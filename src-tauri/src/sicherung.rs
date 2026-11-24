@@ -161,12 +161,14 @@ fn beschreibung(namen: &str) -> String {
     let mut teile: Vec<String> = Vec::new();
     for zeile in namen.lines() {
         let pfad = zeile.split('\t').next_back().unwrap_or_default();
-        let Some((ordner, datei)) = pfad.split_once('/') else { continue };
+        // LF05/Datei.md oder LF05/Unterordner/Datei.md – nicht assets/…
+        let Some((ordner, datei)) = pfad.rsplit_once('/') else { continue };
         let Some(stamm) = datei.strip_suffix(".md") else { continue };
-        if datei.contains('/') {
-            continue; // assets/…
+        if ordner.split('/').any(|t| t == "assets") || ordner.matches('/').count() > 1 {
+            continue;
         }
-        let lf = ordner.split('-').next().unwrap_or(ordner);
+        let oben = ordner.split('/').next().unwrap_or(ordner);
+        let lf = oben.split('-').next().unwrap_or(oben);
         let titel = stamm.get(11..).filter(|_| stamm.len() > 11 && stamm.as_bytes()[10] == b'-').unwrap_or(stamm);
         teile.push(format!("{lf}: {}", titel.replace('-', " ")));
     }
@@ -235,16 +237,16 @@ fn pruefe_hash(hash: &str) -> Ergebnis<()> {
     }
 }
 
-/// Pfad innerhalb von ~/Schule: "<Ordner>/<Datei>.md", ohne Tricks
+/// Pfad innerhalb von ~/Schule: "<Ordner>/<Datei>.md" oder "<Ordner>/<Unterordner>/<Datei>.md", ohne Tricks
 fn pruefe_pfad(pfad: &str) -> Ergebnis<()> {
-    let teile: Vec<&str> = pfad.split('/').collect();
-    match teile.as_slice() {
-        [ordner, datei] if datei.ends_with(".md") => {
-            pruefe_name(ordner)?;
-            pruefe_name(datei)
-        }
-        _ => Err(format!("Ungültiger Pfad: {pfad}")),
+    let Some((ordner, datei)) = pfad.rsplit_once('/') else {
+        return Err(format!("Ungültiger Pfad: {pfad}"));
+    };
+    if !datei.ends_with(".md") {
+        return Err(format!("Ungültiger Pfad: {pfad}"));
     }
+    crate::notizen::pruefe_ordner(ordner)?;
+    pruefe_name(datei)
 }
 
 /// Alle gesicherten Versionen einer Notiz, neueste zuerst (folgt Umbenennungen)

@@ -56,7 +56,8 @@ export function grafikAdresse(ordner: string, src: string): string {
   if (!ordner || !pfad) return "about:blank";
   const basis = convertFileSrc("", "grafik");
   if (/^(grafik|https?):/.test(basis)) {
-    const segmente = [ordner, ...pfad.split("/")].map(encodeURIComponent).join("/");
+    // Unterordner ("LF5/Unicode") als eigene Pfadteile – ein kodierter Schrägstrich würde abgelehnt
+    const segmente = [...ordner.split("/"), ...pfad.split("/")].map(encodeURIComponent).join("/");
     return basis.replace(/\/?$/, "/") + segmente;
   }
   return convertFileSrc(`${ordner}/${pfad}`, "grafik"); // Browser-Simulation

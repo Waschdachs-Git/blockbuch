@@ -13,13 +13,33 @@ type Props = {
   /** Rechtsklick auf einen Ordner */
   onMenue: (name: string, x: number, y: number) => void;
   onHilfe: () => void;
+  /** Ordner, unter dem gerade ein Unterordner benannt wird (Eingabefeld) – sonst null */
+  unterordnerFuer: string | null;
+  onNeuerUnterordner: (eltern: string, name: string) => Promise<boolean>;
+  onUnterordnerAbbrechen: () => void;
   /** Hinweis unten, z. B. "Gesichert heute, 10:42" */
   sicherung: string | null;
   /** Zusatzinfo als Tooltip (z. B. nicht mitgesicherte Projektordner) */
   sicherungHinweis: string | null;
 };
 
-export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, onWeiter, onNeuerOrdner, onMenue, onHilfe, sicherung, sicherungHinweis }: Props) {
+export function Sidebar({
+  ref,
+  hidden,
+  lernfelder,
+  faecher,
+  aktiv,
+  onAuswahl,
+  onWeiter,
+  onNeuerOrdner,
+  onMenue,
+  onHilfe,
+  unterordnerFuer,
+  onNeuerUnterordner,
+  onUnterordnerAbbrechen,
+  sicherung,
+  sicherungHinweis,
+}: Props) {
   const navRef = useRef<HTMLElement | null>(null);
   const [neuerOrdner, setNeuerOrdner] = useState<string | null>(null);
   const legtAn = useRef(false);
@@ -68,13 +88,25 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
     if (ok) setNeuerOrdner(null);
   }
 
-  function eintrag(o: Ordner) {
-    const istAktiv = o.name === aktiv;
+  /** Eingabefeld für einen neuen Unterordner – erscheint hinter dem letzten Unterordner von `eltern` */
+  function unterordnerEingabe(o: Ordner, liste: Ordner[]) {
+    if (!unterordnerFuer) return null;
+    const letzter = [...liste].reverse().find((x) => x.name === unterordnerFuer || x.eltern === unterordnerFuer);
+    if (letzter?.name !== o.name) return null;
     return (
+      <li key={`${unterordnerFuer}/+`}>
+        <UnterordnerEingabe eltern={unterordnerFuer} onFertig={onNeuerUnterordner} onAbbrechen={onUnterordnerAbbrechen} />
+      </li>
+    );
+  }
+
+  function eintrag(o: Ordner, _i: number, liste: Ordner[]) {
+    const istAktiv = o.name === aktiv;
+    return [
       <li key={o.name}>
         <button
           data-ordner={o.name}
-          className={`sidebar__eintrag ${istAktiv ? "ist-aktiv" : ""}`}
+          className={`sidebar__eintrag ${o.eltern ? "sidebar__eintrag--unter" : ""} ${istAktiv ? "ist-aktiv" : ""}`}
           aria-current={istAktiv ? "true" : undefined}
           tabIndex={istAktiv ? 0 : -1}
           title={o.titel}
@@ -91,8 +123,9 @@ export function Sidebar({ ref, hidden, lernfelder, faecher, aktiv, onAuswahl, on
           </span>
           <span className="sidebar__name">{o.anzeige}</span>
         </button>
-      </li>
-    );
+      </li>,
+      unterordnerEingabe(o, liste),
+    ];
   }
 
   return (
@@ -170,5 +203,42 @@ function OrdnerIcon() {
         strokeWidth="1.1"
       />
     </svg>
+  );
+}
+
+/** Name für einen neuen Unterordner eintippen (Enter legt an, Esc bricht ab) */
+function UnterordnerEingabe({
+  eltern,
+  onFertig,
+  onAbbrechen,
+}: {
+  eltern: string;
+  onFertig: (eltern: string, name: string) => Promise<boolean>;
+  onAbbrechen: () => void;
+}) {
+  const [wert, setWert] = useState("");
+  const laeuft = useRef(false);
+  async function anlegen() {
+    if (laeuft.current) return;
+    const name = wert.trim();
+    if (!name) return onAbbrechen();
+    laeuft.current = true;
+    await onFertig(eltern, name);
+    laeuft.current = false;
+  }
+  return (
+    <input
+      className="inline-eingabe inline-eingabe--unter"
+      autoFocus
+      placeholder="Name des Unterordners"
+      aria-label={`Neuer Unterordner in ${eltern}`}
+      value={wert}
+      onChange={(e) => setWert(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") anlegen();
+        if (e.key === "Escape") onAbbrechen();
+      }}
+      onBlur={() => !laeuft.current && onAbbrechen()}
+    />
   );
 }

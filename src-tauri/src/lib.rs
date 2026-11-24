@@ -78,7 +78,7 @@ async fn ordner_erstellen(app: tauri::AppHandle, name: String) -> Ergebnis<Vec<S
 
 #[tauri::command]
 async fn ordner_auflisten(app: tauri::AppHandle) -> Ergebnis<Vec<String>> {
-    notizen::ordner_liste(&schule_pfad(&app)?)
+    notizen::alle_ordner(&schule_pfad(&app)?)
 }
 
 #[tauri::command]
@@ -276,6 +276,18 @@ async fn notiz_umbenennen(app: tauri::AppHandle, ordner: String, datei: String, 
     notizen::notiz_umbenennen(&schule_pfad(&app)?, &ordner, &datei, &titel)
 }
 
+/// Unterordner anlegen, z. B. LF5 → Unicode
+#[tauri::command]
+async fn unterordner_erstellen(app: tauri::AppHandle, eltern: String, name: String) -> Ergebnis<Vec<String>> {
+    notizen::unterordner_erstellen(&schule_pfad(&app)?, &eltern, &name)
+}
+
+/// Notiz in einen anderen Ordner verschieben (Bilder/PDFs werden mitkopiert)
+#[tauri::command]
+async fn notiz_verschieben(app: tauri::AppHandle, ordner: String, datei: String, ziel: String) -> Ergebnis<notizen::NotizInfo> {
+    notizen::notiz_verschieben(&schule_pfad(&app)?, &ordner, &datei, &ziel)
+}
+
 /// Inhalt eines Ordners zählen (für die Rückfrage vor dem Löschen)
 #[tauri::command]
 async fn ordner_inhalt(app: tauri::AppHandle, ordner: String) -> Ergebnis<notizen::OrdnerInhalt> {
@@ -287,7 +299,7 @@ async fn ordner_inhalt(app: tauri::AppHandle, ordner: String) -> Ergebnis<notize
 async fn ordner_loeschen(app: tauri::AppHandle, ordner: String) -> Ergebnis<Vec<String>> {
     let root = schule_pfad(&app)?;
     notizen::ordner_loeschen(&root, &ordner)?;
-    notizen::ordner_liste(&root)
+    notizen::alle_ordner(&root)
 }
 
 #[tauri::command]
@@ -347,7 +359,9 @@ pub fn run() {
             notiz_umbenennen,
             notiz_loeschen,
             ordner_loeschen,
-            ordner_inhalt
+            ordner_inhalt,
+            unterordner_erstellen,
+            notiz_verschieben
         ])
         // Eigenes Menü: ⌘Q läuft über "beenden_anfragen" statt macOS direkt beenden zu lassen
         // (das Standard-"Beenden" schließt die App sofort, ohne dass die Oberfläche speichern kann)

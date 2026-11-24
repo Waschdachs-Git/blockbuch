@@ -190,6 +190,19 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
     case "notiz_loeschen":
       delete fs[a.ordner][a.datei];
       return null;
+    case "unterordner_erstellen": {
+      const name = `${a.eltern}/${String(a.name).trim()}`;
+      if (ordner().some((k) => k.toLowerCase() === name.toLowerCase())) throw `„${a.name}“ gibt es in ${a.eltern} schon.`;
+      fs[name] = {};
+      return ordner();
+    }
+    case "notiz_verschieben": {
+      const inhalt = fs[a.ordner][a.datei];
+      if (inhalt === undefined) throw `„${a.datei}“ gibt es nicht mehr.`;
+      fs[a.ziel][a.datei] = inhalt;
+      delete fs[a.ordner][a.datei];
+      return info(a.datei, inhalt);
+    }
     case "ordner_inhalt": {
       const namen = Object.keys(fs[a.ordner] ?? {});
       return { notizen: namen.filter((n) => n.endsWith(".md") && !n.includes("/")).length, dateien: namen.filter((n) => n.includes("/")).length };

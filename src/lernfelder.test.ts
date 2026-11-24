@@ -16,3 +16,12 @@ it("Lernfeld-Nummern aus Ordnernamen", () => {
   expect(lernfeldNummer("LF5x")).toBeNull();
   expect(lernfeldNummer("Deutsch")).toBeNull();
 });
+
+it("Unterordner stehen eingerückt direkt unter ihrem Ordner und erben das Lernfeld", () => {
+  const { lernfelder, faecher } = ordnerAusNamen(["LF5", "LF5/Unicode", "LF5/Speicher", "LF1", "Deutsch", "Deutsch/Gedichte"]);
+  expect(lernfelder.map((o) => o.name)).toEqual(["LF1", "LF5", "LF5/Speicher", "LF5/Unicode"]);
+  const unicode = lernfelder[3];
+  expect(unicode).toMatchObject({ anzeige: "Unicode", titel: "LF5 › Unicode", eltern: "LF5", lernfeld: { id: "LF05", nr: 5 } });
+  expect(faecher.map((o) => o.anzeige)).toEqual(["Deutsch", "Gedichte"]);
+  expect(faecher[1].lernfeld).toBeUndefined();
+});

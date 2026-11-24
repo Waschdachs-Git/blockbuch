@@ -4,7 +4,7 @@ argument-hint: "[Notiz oder Ordner, leer = heutige Notizen]"
 ---
 
 Korrigiere die Rechtschreibung in: $ARGUMENTS
-(Ist das leer, nimm alle Notizen, deren `datum` heute ist – in allen Ordnern außer `Gerettet/` und `Claude/`.)
+(Ist das leer, nimm alle Notizen, deren `datum` heute ist – in allen Ordnern und Unterordnern außer `Gerettet/` und `Claude/`.)
 
 Der Nutzer hat eine **Lese-Rechtschreib-Schwäche (LRS)** und bittet ausdrücklich um diese Korrektur.
 Das ist die **einzige Ausnahme** von der Regel „Mitschrift nicht verändern“ in `Claude/CLAUDE.md` –

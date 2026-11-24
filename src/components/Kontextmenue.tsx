@@ -97,9 +97,9 @@ export function Kontextmenue({
       onKeyDown={onKeyDown}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {eintraege.map((m) => (
+      {eintraege.map((m, i) => (
         <button
-          key={m.titel}
+          key={i}
           role="menuitem"
           aria-disabled={m.gesperrt ? true : undefined}
           className={`kontextmenue__eintrag ${m.gefaehrlich ? "ist-gefaehrlich" : ""}`}

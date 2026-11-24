@@ -10,7 +10,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::notizen::{ordner_liste, CLAUDE_ORDNER};
+use crate::notizen::{alle_ordner, CLAUDE_ORDNER};
 
 /// Ab 3 Buchstaben: Kurze Wörter werden zwar nicht vorgeschlagen, gelten aber als bekannt – so wird
 /// ein richtig geschriebenes kurzes Wort nicht "korrigiert"
@@ -83,7 +83,7 @@ fn zaehlen(text: &str, gewicht: u32, zaehler: &mut HashMap<String, u32>) {
 
 pub fn sammeln(root: &Path) -> Vec<Wort> {
     let mut zaehler: HashMap<String, u32> = HashMap::new();
-    for ordner in ordner_liste(root).unwrap_or_default() {
+    for ordner in alle_ordner(root).unwrap_or_default() {
         if ordner == "Gerettet" || ordner == CLAUDE_ORDNER {
             continue;
         }

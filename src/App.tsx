@@ -26,6 +26,7 @@ function App() {
   const [versionenOffen, setVersionenOffen] = useState(false);
   const [sicherung, setSicherung] = useState<SicherungsStand | null>(null);
   const [hilfeOffen, setHilfeOffen] = useState(false);
+  const [unterordnerFuer, setUnterordnerFuer] = useState<string | null>(null);
   const [menue, setMenue] = useState<{ x: number; y: number; eintraege: MenueEintrag[] } | null>(null);
   const [rueckfrage, setRueckfrage] = useState<{ titel: string; text: string; ja: string; onJa: () => void } | null>(null);
   const menueSchliessen = useCallback(() => setMenue(null), []);
@@ -252,9 +253,57 @@ function App() {
       y,
       eintraege: [
         { titel: "Umbenennen", kuerzel: "↩", aktion: () => setUmbenennenDatei(datei) },
+        {
+          titel: "Verschieben nach …",
+          aktion: () => verschiebenMenue(datei, x, y),
+        },
         { titel: "In den Papierkorb", kuerzel: "⌘⌫", gefaehrlich: true, aktion: () => loeschen(datei) },
       ],
     });
+  }
+
+  /** Zweites Menü: alle Ordner und Unterordner als Ziel (außer dem eigenen und Claude/Gerettet) */
+  function verschiebenMenue(datei: string, x: number, y: number) {
+    if (!ordner) return;
+    const von = ordner.name;
+    const ziele = alleOrdner.filter((o) => o.name !== von && o.name !== "Claude" && o.name !== "Gerettet");
+    setMenue({
+      x,
+      y,
+      eintraege: ziele.map((o) => ({
+        titel: o.eltern ? `↳ ${o.anzeige}` : o.anzeige,
+        aktion: () => verschieben(von, datei, o.name),
+      })),
+    });
+  }
+
+  async function verschieben(von: string, datei: string, ziel: string) {
+    try {
+      if (aktiveDateiRef.current === datei) await editorRef.current?.speichernJetzt();
+      const info = await api.notizVerschieben(von, datei, ziel);
+      // In den Zielordner wechseln und die Notiz dort auswählen
+      auswahlNachOrdnerwechsel.current = info.datei;
+      setAktiverOrdner(ziel);
+      const zielAnzeige = alleOrdner.find((o) => o.name === ziel)?.titel ?? ziel;
+      setStatusText(`Verschoben nach ${zielAnzeige}`);
+      window.setTimeout(() => setStatusText((t) => (t?.startsWith("Verschoben nach") ? null : t)), 2500);
+    } catch (e) {
+      melde(e);
+    }
+  }
+
+  async function neuerUnterordner(eltern: string, name: string): Promise<boolean> {
+    try {
+      const liste = await api.unterordnerErstellen(eltern, name);
+      setOrdnerNamen(liste);
+      setUnterordnerFuer(null);
+      setAktiverOrdner(`${eltern}/${name.trim()}`);
+      requestAnimationFrame(fokusSidebar);
+      return true;
+    } catch (e) {
+      melde(e);
+      return false;
+    }
   }
 
   /** Rechtsklick auf einen Ordner */
@@ -263,8 +312,11 @@ function App() {
       x,
       y,
       eintraege: [
+        ...(name.includes("/") || name === "Claude" || name === "Gerettet"
+          ? []
+          : [{ titel: "Neuer Unterordner", aktion: () => setUnterordnerFuer(name) }]),
         {
-          titel: "Ordner in den Papierkorb …",
+          titel: name.includes("/") ? "Unterordner in den Papierkorb …" : "Ordner in den Papierkorb …",
           gefaehrlich: true,
           gesperrt: name === "Claude" ? "Den Ordner „Claude“ braucht Blockbuch (Anleitung und Profil für Claude)." : undefined,
           aktion: () => ordnerLoeschenFragen(name),
@@ -298,7 +350,9 @@ function App() {
           if (istOffen) await editorRef.current?.speichernJetzt();
           const liste = await api.ordnerLoeschen(name);
           setOrdnerNamen(liste);
-          if (istOffen) setAktiverOrdner(ordnerAusNamen(liste).lernfelder[0]?.name ?? liste[0] ?? "");
+          // Unterordner gelöscht → zum Ordner darüber, sonst zum ersten Lernfeld
+          const eltern = name.includes("/") ? name.split("/")[0] : null;
+          if (istOffen) setAktiverOrdner(eltern ?? ordnerAusNamen(liste).lernfelder[0]?.name ?? liste[0] ?? "");
           setRueckfrage(null);
           setStatusText(`„${anzeige}“ liegt im Papierkorb`);
           window.setTimeout(() => setStatusText((t) => (t?.endsWith("liegt im Papierkorb") ? null : t)), 2500);
@@ -471,6 +525,12 @@ function App() {
         onNeuerOrdner={neuerOrdner}
         onMenue={ordnerMenue}
         onHilfe={() => setHilfeOffen(true)}
+        unterordnerFuer={unterordnerFuer}
+        onNeuerUnterordner={neuerUnterordner}
+        onUnterordnerAbbrechen={() => {
+          setUnterordnerFuer(null);
+          requestAnimationFrame(fokusSidebar);
+        }}
         sicherung={
           sicherung?.fehler
             ? `⚠︎ Sicherung: ${sicherung.fehler}`

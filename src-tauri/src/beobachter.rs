@@ -40,7 +40,17 @@ pub fn einordnen(root: &Path, pfad: &Path) -> Option<Aenderung> {
             ordner: Some((*ordner).to_string()),
             datei: Some((*datei).to_string()),
         }),
-        [ordner, ..] => Some(Aenderung { ordner: Some((*ordner).to_string()), datei: None }),
+        // Bilder/PDFs des Ordners
+        [ordner, "assets", ..] => Some(Aenderung { ordner: Some((*ordner).to_string()), datei: None }),
+        // Unterordner (LF5/Unicode): angelegt/gelöscht, Notiz darin, assets darin
+        [ordner, unter, datei] if datei.ends_with(".md") => Some(Aenderung {
+            ordner: Some(format!("{ordner}/{unter}")),
+            datei: Some((*datei).to_string()),
+        }),
+        [ordner, unter] if unter.contains('.') && !pfad.is_dir() => {
+            Some(Aenderung { ordner: Some((*ordner).to_string()), datei: None })
+        }
+        [ordner, unter, ..] => Some(Aenderung { ordner: Some(format!("{ordner}/{unter}")), datei: None }),
     }
 }
 
@@ -88,6 +98,10 @@ mod tests {
         assert_eq!(einordnen(root, Path::new("/Users/x/Schule/LF05/2026-10-07-Joins.md")), a(Some("LF05"), Some("2026-10-07-Joins.md")));
         assert_eq!(einordnen(root, Path::new("/Users/x/Schule/LF05")), a(Some("LF05"), None));
         assert_eq!(einordnen(root, Path::new("/Users/x/Schule/LF05/assets/bild.png")), a(Some("LF05"), None));
+        // Unterordner
+        assert_eq!(einordnen(root, Path::new("/Users/x/Schule/LF05/Unicode/2026-10-07-UTF8.md")), a(Some("LF05/Unicode"), Some("2026-10-07-UTF8.md")));
+        assert_eq!(einordnen(root, Path::new("/Users/x/Schule/LF05/Unicode/assets/bild.png")), a(Some("LF05/Unicode"), None));
+        assert_eq!(einordnen(root, Path::new("/Users/x/Schule/LF05/Unicode")), a(Some("LF05/Unicode"), None));
         assert_eq!(einordnen(root, Path::new("/Users/x/Schule")), a(None, None));
     }
 

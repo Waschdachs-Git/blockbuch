@@ -60,6 +60,10 @@ export const api = {
   notizLoeschen: (ordner: string, datei: string) => invoke<void>("notiz_loeschen", { ordner, datei }),
   /** Ordner mit allen Notizen in den Papierkorb – gibt die neue Ordnerliste zurück */
   ordnerLoeschen: (ordner: string) => invoke<string[]>("ordner_loeschen", { ordner }),
+  /** Unterordner anlegen ("LF5" + "Unicode") – gibt die neue Ordnerliste zurück */
+  unterordnerErstellen: (eltern: string, name: string) => invoke<string[]>("unterordner_erstellen", { eltern, name }),
+  /** Notiz in einen anderen Ordner verschieben (Bilder/PDFs werden mitkopiert) */
+  notizVerschieben: (ordner: string, datei: string, ziel: string) => invoke<NotizInfo>("notiz_verschieben", { ordner, datei, ziel }),
   /** Notizen und übrige Dateien (assets/, Unterordner) in einem Ordner */
   ordnerInhalt: (ordner: string) => invoke<{ notizen: number; dateien: number }>("ordner_inhalt", { ordner }),
 };

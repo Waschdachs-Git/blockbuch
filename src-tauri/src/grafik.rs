@@ -63,18 +63,21 @@ pub fn antwort(root: &Path, pfad: &str) -> Antwort {
         .collect();
     let teile: Vec<&str> = teile.iter().map(String::as_str).collect();
 
-    let [ordner, "assets", datei] = teile.as_slice() else {
-        return fehlerseite(404, "Grafiken müssen im Ordner assets/ liegen.");
+    // <Ordner>/assets/<Datei> oder <Ordner>/<Unterordner>/assets/<Datei>
+    let (ordner, datei) = match teile.as_slice() {
+        [ordner, "assets", datei] => (ordner.to_string(), *datei),
+        [ordner, unter, "assets", datei] => (format!("{ordner}/{unter}"), *datei),
+        _ => return fehlerseite(404, "Grafiken müssen im Ordner assets/ liegen."),
     };
     let gueltig = |t: &str| !t.starts_with('.') && !t.contains(['/', '\\', '\0', ':']);
-    if !gueltig(ordner) || !gueltig(datei) {
+    if ordner.split('/').any(|t| !gueltig(t)) || !gueltig(datei) {
         return fehlerseite(400, "Ungültiger Pfad.");
     }
     // Unerlaubte Typen gar nicht erst auf der Platte suchen
     if typ_fuer(datei).is_none() {
         return fehlerseite(415, "Dieser Dateityp wird nicht angezeigt.");
     }
-    let assets = root.join(ordner).join("assets");
+    let assets = root.join(&ordner).join("assets");
     // Symlinks dürfen nicht aus diesem assets/-Ordner herausführen (z. B. auf eine Notiz)
     let (Ok(echt), Ok(echt_assets)) = (assets.join(datei).canonicalize(), assets.canonicalize()) else {
         return fehlerseite(404, &format!("Grafik nicht gefunden: {ordner}/assets/{datei}"));
@@ -129,6 +132,12 @@ mod tests {
         // Umlaute/Leerzeichen im Namen (kodiert)
         fs::write(root.join("LF05/assets/Größe über.html"), "x").unwrap();
         assert_eq!(antwort(&root, "/LF05/assets/Gr%C3%B6%C3%9Fe%20%C3%BCber.html").status, 200);
+        // Unterordner
+        fs::create_dir_all(root.join("LF05/Unicode/assets")).unwrap();
+        fs::write(root.join("LF05/Unicode/assets/utf8.html"), "x").unwrap();
+        assert_eq!(antwort(&root, "/LF05/Unicode/assets/utf8.html").status, 200);
+        assert_eq!(antwort(&root, "/LF05/..%2F..%2Fx/assets/utf8.html").status, 400);
+        assert_eq!(antwort(&root, "/LF05/.git/assets/utf8.html").status, 400);
         // Ganzer Pfad in einem kodierten Segment gilt nicht
         assert_eq!(antwort(&root, "/LF05%2Fassets%2Fjoin.html").status, 404);
     }

@@ -5,7 +5,7 @@
 // Fehlertolerant (Hilfe bei LRS): Kommt ein Suchwort ab 5 Buchstaben nirgends vor, sucht die Suche
 // stattdessen nach ähnlich geschriebenen Wörtern ("Primerschlüsel" → "Primärschlüssel").
 
-use crate::notizen::{lies_info, ordner_liste};
+use crate::notizen::{alle_ordner, lies_info};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
@@ -350,12 +350,14 @@ pub fn suchen(root: &Path, anfrage: &str, max: usize) -> Vec<Treffer> {
         geaendert: u64,
     }
     let mut dokumente: Vec<Dokument> = Vec::new();
-    for ordner in ordner_liste(root).unwrap_or_default() {
+    for ordner in alle_ordner(root).unwrap_or_default() {
         if ordner == "Gerettet" || ordner == crate::notizen::CLAUDE_ORDNER {
             continue; // Konfliktkopien und Claude-Anleitung nicht in der Suche
         }
+        // "lf5" findet auch die Unterordner von LF5
+        let oben = ordner.split('/').next().unwrap_or(&ordner);
         if let Some(lf) = lernfeld {
-            if lernfeld_nummer(&ordner) != Some(lf) {
+            if lernfeld_nummer(oben) != Some(lf) {
                 continue;
             }
         }

@@ -75,13 +75,9 @@ pub fn txt_erzeugen(pdf: &Path) -> Result<bool, String> {
 /// Alle PDFs in <Ordner>/assets/ ohne .txt nachträglich auslesen (beim Start)
 pub fn fehlende_erzeugen(root: &Path) -> usize {
     let mut anzahl = 0;
-    let Ok(ordner) = fs::read_dir(root) else { return 0 };
-    for o in ordner.flatten() {
-        let name = o.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') {
-            continue;
-        }
-        let Ok(dateien) = fs::read_dir(o.path().join("assets")) else { continue };
+    // alle Ordner und Unterordner (LF5, LF5/Unicode …)
+    for o in crate::notizen::alle_ordner(root).unwrap_or_default() {
+        let Ok(dateien) = fs::read_dir(root.join(&o).join("assets")) else { continue };
         for d in dateien.flatten() {
             let p = d.path();
             if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("pdf")) && matches!(txt_erzeugen(&p), Ok(true)) {

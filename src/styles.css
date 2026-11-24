@@ -1781,3 +1781,18 @@ button {
 .tabellen-leiste button.ist-gefaehrlich:hover {
   color: #c4314b;
 }
+
+/* Unterordner in der Ordner-Leiste: eingerückt, etwas kleiner */
+.sidebar__eintrag--unter {
+  padding-left: 30px;
+  font-size: 12.5px;
+}
+
+.sidebar__eintrag--unter .sidebar__nummer {
+  opacity: 0.7;
+}
+
+.inline-eingabe--unter {
+  margin-left: 22px;
+  width: calc(100% - 22px);
+}

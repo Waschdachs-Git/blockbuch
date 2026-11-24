@@ -40,8 +40,25 @@ pub fn pruefe_name(name: &str) -> Ergebnis<()> {
     Ok(())
 }
 
+/// Ordner-Angabe: "LF5" oder ein Unterordner "LF5/Unicode" (genau eine Ebene). "assets" ist kein Unterordner.
+pub fn pruefe_ordner(ordner: &str) -> Ergebnis<()> {
+    let teile: Vec<&str> = ordner.split('/').collect();
+    match teile.as_slice() {
+        [name] => pruefe_name(name),
+        [oben, unter] => {
+            pruefe_name(oben)?;
+            pruefe_name(unter)?;
+            if unter.eq_ignore_ascii_case("assets") {
+                return Err("„assets“ ist für Bilder und PDFs reserviert.".into());
+            }
+            Ok(())
+        }
+        _ => Err(format!("Ungültiger Ordner: „{ordner}“")),
+    }
+}
+
 pub fn ordner_pfad(root: &Path, ordner: &str) -> Ergebnis<PathBuf> {
-    pruefe_name(ordner)?;
+    pruefe_ordner(ordner)?;
     let pfad = root.join(ordner);
     if !pfad.is_dir() {
         return Err(format!("Ordner „{ordner}“ gibt es nicht mehr."));
@@ -67,6 +84,30 @@ pub fn ordner_liste(root: &Path) -> Ergebnis<Vec<String>> {
         .collect();
     namen.sort();
     Ok(namen)
+}
+
+/// Alle Ordner mit ihren Unterordnern, sortiert: "LF5", "LF5/Speicher", "LF5/Unicode", "Mathe-IT" …
+/// Unterordner: eine Ebene, ohne versteckte, ohne "assets" und ohne Projektordner mit eigenem Git
+/// (Code-Projekte gehören nicht in die Notizliste). Claude/ und Gerettet/ haben keine Unterordner.
+pub fn alle_ordner(root: &Path) -> Ergebnis<Vec<String>> {
+    let mut liste = Vec::new();
+    for oben in ordner_liste(root)? {
+        liste.push(oben.clone());
+        if oben == CLAUDE_ORDNER || oben == "Gerettet" {
+            continue;
+        }
+        let mut unter: Vec<String> = fs::read_dir(root.join(&oben))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter(|e| e.path().is_dir() && !e.path().join(".git").exists())
+            .filter_map(|e| e.file_name().into_string().ok())
+            .filter(|n| !n.starts_with('.') && !n.eq_ignore_ascii_case("assets"))
+            .collect();
+        unter.sort();
+        liste.extend(unter.into_iter().map(|u| format!("{oben}/{u}")));
+    }
+    Ok(liste)
 }
 
 /// "Subnetting & VLSM" -> "Subnetting-VLSM", Umlaute werden ausgeschrieben.
@@ -378,7 +419,7 @@ pub fn schule_oeffnen(root: &Path, standard_ordner: &[String]) -> Ergebnis<Vec<S
         fs::create_dir_all(root.join(name)).map_err(fehler)?;
     }
     vorlagen_anlegen(root)?;
-    ordner_liste(root)
+    alle_ordner(root)
 }
 
 pub fn ordner_erstellen(root: &Path, name: &str) -> Ergebnis<Vec<String>> {
@@ -389,7 +430,120 @@ pub fn ordner_erstellen(root: &Path, name: &str) -> Ergebnis<Vec<String>> {
         return Err(format!("Ordner „{name}“ gibt es schon."));
     }
     fs::create_dir(root.join(name)).map_err(fehler)?;
-    ordner_liste(root)
+    alle_ordner(root)
+}
+
+/// Unterordner in einem Ordner anlegen, z. B. "LF5" + "Unicode" → LF5/Unicode
+pub fn unterordner_erstellen(root: &Path, eltern: &str, name: &str) -> Ergebnis<Vec<String>> {
+    let name = name.trim();
+    if eltern.contains('/') {
+        return Err("Unterordner gehen nur eine Ebene tief.".into());
+    }
+    if eltern == CLAUDE_ORDNER || eltern == "Gerettet" {
+        return Err(format!("In „{eltern}“ kann man keine Unterordner anlegen."));
+    }
+    let pfad = format!("{eltern}/{name}");
+    pruefe_ordner(&pfad)?;
+    let eltern_p = ordner_pfad(root, eltern)?;
+    let gibt_es = fs::read_dir(&eltern_p)
+        .map_err(fehler)?
+        .flatten()
+        .any(|e| e.file_name().to_string_lossy().to_lowercase() == name.to_lowercase());
+    if gibt_es {
+        return Err(format!("„{name}“ gibt es in {eltern} schon."));
+    }
+    fs::create_dir(eltern_p.join(name)).map_err(fehler)?;
+    alle_ordner(root)
+}
+
+/// Notiz in einen anderen Ordner verschieben. Bilder, PDFs und Grafiken, auf die sie verweist
+/// (assets/…), werden in den assets/-Ordner des Ziels kopiert – das Original bleibt, falls andere
+/// Notizen es auch nutzen. Gibt es dort schon eine andere Datei mit dem Namen, bekommt die Kopie
+/// einen freien Namen und der Verweis in der Notiz wird angepasst. Überschreibt nie etwas.
+pub fn notiz_verschieben(root: &Path, ordner: &str, datei: &str, ziel: &str) -> Ergebnis<NotizInfo> {
+    let quelle = notiz_pfad(root, ordner, datei)?;
+    if !quelle.is_file() {
+        return Err(format!("„{datei}“ gibt es nicht mehr."));
+    }
+    let ziel_p = ordner_pfad(root, ziel)?;
+    if ziel_p == ordner_pfad(root, ordner)? {
+        return Err("Die Notiz liegt schon in diesem Ordner.".into());
+    }
+    if ziel == CLAUDE_ORDNER || ziel == "Gerettet" {
+        return Err(format!("In „{ziel}“ kann man keine Notizen verschieben."));
+    }
+    let mut inhalt = fs::read_to_string(&quelle).map_err(fehler)?;
+    let quell_assets = ordner_pfad(root, ordner)?.join("assets");
+    let ziel_assets = ziel_p.join("assets");
+    for verweis in asset_verweise(&inhalt) {
+        let name = &verweis["assets/".len()..];
+        let Ok(alt) = asset_pfad(root, ordner, &verweis) else { continue }; // fehlt schon – nichts zu tun
+        fs::create_dir_all(&ziel_assets).map_err(fehler)?;
+        let mut neu_name = name.to_string();
+        let ziel_datei = ziel_assets.join(name);
+        if ziel_datei.exists() {
+            if fs::read(&ziel_datei).ok() != fs::read(&alt).ok() {
+                let (stamm, endung) = name.rsplit_once('.').unwrap_or((name, ""));
+                neu_name = (2..1000)
+                    .map(|i| if endung.is_empty() { format!("{stamm}-{i}") } else { format!("{stamm}-{i}.{endung}") })
+                    .find(|n| !ziel_assets.join(n).exists())
+                    .ok_or("Kein freier Dateiname gefunden.")?;
+                fs::copy(&alt, ziel_assets.join(&neu_name)).map_err(fehler)?;
+                inhalt = inhalt.replace(&verweis, &format!("assets/{neu_name}"));
+            }
+        } else {
+            fs::copy(&alt, &ziel_datei).map_err(fehler)?;
+        }
+        // Text eines PDFs (für Suche und Claude) mitnehmen
+        if neu_name.to_lowercase().ends_with(".pdf") {
+            let txt = quell_assets.join(format!("{}.txt", &name[..name.len() - 4]));
+            let txt_ziel = ziel_assets.join(format!("{}.txt", &neu_name[..neu_name.len() - 4]));
+            if txt.is_file() && !txt_ziel.exists() {
+                let _ = fs::copy(&txt, &txt_ziel);
+            }
+        }
+    }
+    // Ziel-Dateiname: gleicher Name, sonst freier Name – erst schreiben, dann das Original löschen
+    let stamm = datei.trim_end_matches(".md");
+    let neu = if ziel_p.join(datei).exists() { freier_dateiname(&ziel_p, stamm) } else { datei.to_string() };
+    let ziel_notiz = ziel_p.join(&neu);
+    let mut f = fs::OpenOptions::new().write(true).create_new(true).open(&ziel_notiz).map_err(fehler)?;
+    f.write_all(inhalt.as_bytes()).map_err(fehler)?;
+    f.sync_all().map_err(fehler)?;
+    fs::remove_file(&quelle).map_err(fehler)?;
+    lies_info(&ziel_notiz)
+}
+
+/// Alle Verweise einer Notiz auf eigene Dateien: ![…](assets/x.png), ![…](<assets/x y.png>),
+/// "src: assets/x.pdf" in ```pdf/```grafik-Blöcken
+fn asset_verweise(inhalt: &str) -> Vec<String> {
+    let mut liste: Vec<String> = Vec::new();
+    let mut nimm = |v: &str| {
+        let v = v.trim().trim_start_matches("./");
+        if let Some(name) = v.strip_prefix("assets/") {
+            if pruefe_name(name).is_ok() && !liste.iter().any(|x| x == v) {
+                liste.push(v.to_string());
+            }
+        }
+    };
+    let mut rest = inhalt;
+    while let Some(i) = rest.find("](") {
+        rest = &rest[i + 2..];
+        let ende = if let Some(r) = rest.strip_prefix('<') {
+            r.find('>').map(|e| (1, e + 1))
+        } else {
+            rest.find([')', ' ']).map(|e| (0, e))
+        };
+        if let Some((start, e)) = ende {
+            nimm(&rest[start..e]);
+        }
+    }
+    for zeile in inhalt.lines() {
+        if let Some(v) = zeile.trim().strip_prefix("src:") {
+            nimm(v);
+        }
+    }
+    liste
 }
 
 pub fn notizen_auflisten(root: &Path, ordner: &str) -> Ergebnis<Vec<NotizInfo>> {
@@ -428,7 +582,7 @@ pub fn notiz_konfliktkopie(root: &Path, ordner: &str, datei: &str, inhalt: &str,
     if uhrzeit.len() != 4 || !uhrzeit.chars().all(|c| c.is_ascii_digit()) {
         return Err(format!("Ungültige Uhrzeit: {uhrzeit}"));
     }
-    pruefe_name(ordner)?;
+    pruefe_ordner(ordner)?;
     // Darf nie scheitern: gibt es den Ordner nicht mehr (z. B. von Claude umbenannt/gelöscht),
     // landet die Kopie in ~/Schule/Gerettet
     let ordner_p = match ordner_pfad(root, ordner) {
@@ -626,6 +780,10 @@ pub fn notiz_loeschen(root: &Path, ordner: &str, datei: &str) -> Ergebnis<()> {
 /// die App (Anleitung und Profil für Claude) und würde ihn ohnehin neu anlegen.
 pub fn ordner_loeschen(root: &Path, ordner: &str) -> Ergebnis<()> {
     let pfad = ordner_pfad(root, ordner)?;
+    let oben = ordner.split('/').next().unwrap_or(ordner);
+    if oben.eq_ignore_ascii_case(CLAUDE_ORDNER) {
+        return Err("Der Ordner „Claude“ wird von Blockbuch gebraucht und kann nicht gelöscht werden.".into());
+    }
     // Auch "claude" (APFS unterscheidet Groß/Klein nicht) oder ein Verweis auf den Claude-Ordner
     let claude = root.join(CLAUDE_ORDNER);
     let gleich = |a: &Path, b: &Path| matches!((fs::canonicalize(a), fs::canonicalize(b)), (Ok(x), Ok(y)) if x == y);
@@ -685,6 +843,63 @@ mod tests {
         let root = tmp.path().join("Schule");
         schule_oeffnen(&root, &["LF05-Daten".to_string()]).unwrap();
         (tmp, root)
+    }
+
+    #[test]
+    fn unterordner_anlegen_auflisten_und_pruefen() {
+        let (_t, root) = testordner();
+        let liste = unterordner_erstellen(&root, "LF05-Daten", "Unicode").unwrap();
+        assert!(liste.contains(&"LF05-Daten/Unicode".to_string()));
+        let i = liste.iter().position(|o| o == "LF05-Daten").unwrap();
+        assert_eq!(liste[i + 1], "LF05-Daten/Unicode", "Unterordner direkt nach dem Ordner");
+        assert!(unterordner_erstellen(&root, "LF05-Daten", "unicode").is_err(), "gibt es schon");
+        assert!(unterordner_erstellen(&root, "LF05-Daten", "assets").is_err());
+        assert!(unterordner_erstellen(&root, "LF05-Daten/Unicode", "Tief").is_err(), "nur eine Ebene");
+        assert!(unterordner_erstellen(&root, CLAUDE_ORDNER, "x").is_err());
+        // assets, versteckte und Projekte mit eigenem Git sind keine Unterordner
+        fs::create_dir_all(root.join("LF05-Daten/assets")).unwrap();
+        fs::create_dir_all(root.join("LF05-Daten/.privat")).unwrap();
+        fs::create_dir_all(root.join("LF05-Daten/Projekt/.git")).unwrap();
+        let liste = alle_ordner(&root).unwrap();
+        assert!(!liste.iter().any(|o| o.ends_with("/assets") || o.ends_with("/.privat") || o.ends_with("/Projekt")));
+        // Notizen und Bilder im Unterordner
+        let info = notiz_erstellen(&root, "LF05-Daten/Unicode", Some("LF05"), "UTF-8", "2026-10-08").unwrap();
+        assert!(root.join("LF05-Daten/Unicode").join(&info.datei).is_file());
+        assert_eq!(asset_speichern(&root, "LF05-Daten/Unicode", "a.png", b"x").unwrap(), "assets/a.png");
+        assert!(pruefe_ordner("LF05/../x").is_err());
+        assert!(pruefe_ordner("a/b/c").is_err());
+        assert!(pruefe_ordner("LF05/Assets").is_err());
+    }
+
+    #[test]
+    fn notiz_verschieben_nimmt_bilder_und_pdfs_mit() {
+        let (_t, root) = testordner();
+        unterordner_erstellen(&root, "LF05-Daten", "Unicode").unwrap();
+        let o = "LF05-Daten";
+        fs::create_dir_all(root.join(o).join("assets")).unwrap();
+        fs::write(root.join(o).join("assets/tafel.png"), b"BILD").unwrap();
+        fs::write(root.join(o).join("assets/blatt.pdf"), b"%PDF").unwrap();
+        fs::write(root.join(o).join("assets/blatt.txt"), b"Text").unwrap();
+        fs::write(root.join(o).join("assets/gross klein.png"), b"B2").unwrap();
+        let inhalt = "# Notiz\n![Tafel](assets/tafel.png)\n![X](<assets/gross klein.png>)\n```pdf\nsrc: assets/blatt.pdf\n```\n";
+        fs::write(root.join(o).join("2026-10-08-Notiz.md"), inhalt).unwrap();
+        // im Ziel liegt schon ein anderes tafel.png
+        fs::create_dir_all(root.join(o).join("Unicode/assets")).unwrap();
+        fs::write(root.join(o).join("Unicode/assets/tafel.png"), b"ANDERS").unwrap();
+
+        let info = notiz_verschieben(&root, o, "2026-10-08-Notiz.md", "LF05-Daten/Unicode").unwrap();
+        assert!(!root.join(o).join("2026-10-08-Notiz.md").exists(), "Original weg");
+        let neu = fs::read_to_string(root.join(o).join("Unicode").join(&info.datei)).unwrap();
+        assert!(neu.contains("assets/tafel-2.png"), "{neu}");
+        assert_eq!(fs::read(root.join(o).join("Unicode/assets/tafel-2.png")).unwrap(), b"BILD");
+        assert_eq!(fs::read(root.join(o).join("Unicode/assets/tafel.png")).unwrap(), b"ANDERS", "nichts überschrieben");
+        assert_eq!(fs::read(root.join(o).join("Unicode/assets/gross klein.png")).unwrap(), b"B2");
+        assert_eq!(fs::read(root.join(o).join("Unicode/assets/blatt.pdf")).unwrap(), b"%PDF");
+        assert_eq!(fs::read(root.join(o).join("Unicode/assets/blatt.txt")).unwrap(), b"Text");
+        assert!(root.join(o).join("assets/tafel.png").exists(), "Original-Bild bleibt");
+        // gleicher Ordner / Claude: nicht erlaubt
+        assert!(notiz_verschieben(&root, "LF05-Daten/Unicode", &info.datei, "LF05-Daten/Unicode").is_err());
+        assert!(notiz_verschieben(&root, "LF05-Daten/Unicode", &info.datei, CLAUDE_ORDNER).is_err());
     }
 
     #[test]

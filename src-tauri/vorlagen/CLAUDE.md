@@ -20,6 +20,10 @@ aktualisieren (Datum, was sitzt, was geübt werden muss). Den Rest der Datei nur
   der Nutzer angelegt hat – keine weiteren Ordner anlegen und keine umbenennen. Inhaltlich orientieren
   sich die Lernfelder am KMK-Rahmenlehrplan FIAE 2020.
 - weitere Ordner: allgemeine Fächer (z. B. Deutsch, Gemeinschaftskunde, Wirtschaftskunde)
+- **Unterordner:** Ein Ordner kann eine Ebene Unterordner haben, z. B. `LF5/Unicode/` – mit eigenen
+  Notizen und eigenem `assets/`. Notizen dort gehören zum Lernfeld des Ordners darüber
+  (`lernfeld: LF05`). Wenn du Notizen suchst („alle Notizen von heute“, „alles zu LF5“), schau auch in
+  die Unterordner. Unterordner legt nur der Nutzer an.
 - `Claude/`: diese Anleitung (`CLAUDE.md`) und das Profil des Nutzers (`ueber-mich.md`)
 - `Gerettet/`: Konfliktkopien, die die App angelegt hat – nicht anfassen
 - `assets/` (in einem Ordner): Bilder/Dateien zu Notizen
