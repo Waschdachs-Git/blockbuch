@@ -3,6 +3,7 @@
 
 mod beobachter;
 mod grafik;
+mod kartei;
 mod notizen;
 mod pdftext;
 mod sicherung;
@@ -276,6 +277,22 @@ async fn notiz_umbenennen(app: tauri::AppHandle, ordner: String, datei: String, 
     notizen::notiz_umbenennen(&schule_pfad(&app)?, &ordner, &datei, &titel)
 }
 
+/// Karteikarten aus den [!karten]-Kästen – eines Ordners (mit Unterordnern) oder aller Ordner
+#[tauri::command]
+async fn karten_sammeln(app: tauri::AppHandle, ordner: Option<String>) -> Ergebnis<Vec<kartei::Karte>> {
+    Ok(kartei::karten_sammeln(&schule_pfad(&app)?, ordner.as_deref()))
+}
+
+#[tauri::command]
+async fn lernstand_lesen(app: tauri::AppHandle) -> Ergebnis<String> {
+    kartei::lernstand_lesen(&schule_pfad(&app)?)
+}
+
+#[tauri::command]
+async fn lernstand_schreiben(app: tauri::AppHandle, inhalt: String) -> Ergebnis<()> {
+    kartei::lernstand_schreiben(&schule_pfad(&app)?, &inhalt)
+}
+
 /// Unterordner anlegen, z. B. LF5 → Unicode
 #[tauri::command]
 async fn unterordner_erstellen(app: tauri::AppHandle, eltern: String, name: String) -> Ergebnis<Vec<String>> {
@@ -361,7 +378,10 @@ pub fn run() {
             ordner_loeschen,
             ordner_inhalt,
             unterordner_erstellen,
-            notiz_verschieben
+            notiz_verschieben,
+            karten_sammeln,
+            lernstand_lesen,
+            lernstand_schreiben
         ])
         // Eigenes Menü: ⌘Q läuft über "beenden_anfragen" statt macOS direkt beenden zu lassen
         // (das Standard-"Beenden" schließt die App sofort, ohne dass die Oberfläche speichern kann)
@@ -424,6 +444,11 @@ pub fn run() {
                         .build(h)?,
                 )
                 .separator()
+                .item(
+                    &MenuItemBuilder::with_id("karten", "Karteikarten lernen")
+                        .accelerator("CmdOrCtrl+Shift+K")
+                        .build(h)?,
+                )
                 .item(
                     &MenuItemBuilder::with_id("drucken", "Drucken / als PDF sichern …")
                         .accelerator("CmdOrCtrl+P")

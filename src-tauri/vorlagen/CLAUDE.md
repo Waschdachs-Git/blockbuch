@@ -28,6 +28,8 @@ aktualisieren (Datum, was sitzt, was geübt werden muss). Den Rest der Datei nur
 - `Gerettet/`: Konfliktkopien, die die App angelegt hat – nicht anfassen
 - `assets/` (in einem Ordner): Bilder/Dateien zu Notizen
 - `.claude/`: Befehle für dich – keine Notizen
+- `.blockbuch/`: Lernstand der Karteikarten (wann welche Karte wieder dran ist) – nicht ändern. Lesen
+  ist erlaubt, z. B. um zu sehen, welche Karten oft vergessen werden (`fehler`), und gezielt zu üben.
 
 ## Die wichtigste Regel: Die Mitschrift gehört dem Nutzer
 

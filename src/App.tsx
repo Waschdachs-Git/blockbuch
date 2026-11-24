@@ -7,6 +7,9 @@ import { EditorPane, type EditorHandle } from "./components/EditorPane";
 import { Suche } from "./components/Suche";
 import { Versionen, zeitAnzeigen } from "./components/Versionen";
 import { Hilfe } from "./components/Hilfe";
+import { Kartei } from "./karten/Kartei";
+import { lernstandAusText } from "./karten/planer";
+import { faelligAnzeige, faelligJeOrdner, type Faellig } from "./karten/sitzung";
 import { Kontextmenue, Rueckfrage, type MenueEintrag } from "./components/Kontextmenue";
 import { useStoredState } from "./useStoredState";
 import { ASSETS_GEAENDERT } from "./editor/grafikBlock";
@@ -28,12 +31,17 @@ function App() {
   const [sicherung, setSicherung] = useState<SicherungsStand | null>(null);
   const [hilfeOffen, setHilfeOffen] = useState(false);
   const [unterordnerFuer, setUnterordnerFuer] = useState<string | null>(null);
+  // Karteikarten: offene Lernsitzung (ordner null = alle) und fällige Karten je Ordner
+  const [kartei, setKartei] = useState<{ ordner: string | null; titel: string } | null>(null);
+  const [faellig, setFaellig] = useState<Faellig | null>(null);
   // nr: jedes Menü neu aufbauen (Untermenü „Verschieben nach …“ an derselben Stelle: Fokus und Position neu)
   const [menue, setMenueZustand] = useState<{ nr: number; x: number; y: number; eintraege: MenueEintrag[] } | null>(null);
   const menueNr = useRef(0);
   const setMenue = (m: { x: number; y: number; eintraege: MenueEintrag[] }) => setMenueZustand({ ...m, nr: ++menueNr.current });
   const [rueckfrage, setRueckfrage] = useState<{ titel: string; text: string; ja: string; onJa: () => void } | null>(null);
   const menueSchliessen = useCallback(() => setMenueZustand(null), []);
+  const karteiRef = useRef(kartei);
+  karteiRef.current = kartei;
   const rueckfrageRef = useRef(rueckfrage);
   rueckfrageRef.current = rueckfrage;
   // Notiz, die nach einem Ordnerwechsel (aus der Suche) ausgewählt werden soll
@@ -116,6 +124,37 @@ function App() {
       abmelden?.();
     };
   }, []);
+
+  // Fällige Karteikarten zählen – beim Start, nach dem Lernen und (verzögert) nach Änderungen
+  const faelligZaehlen = useCallback(() => {
+    Promise.all([api.kartenSammeln(null), api.lernstandLesen()])
+      .then(([karten, text]) => setFaellig(faelligJeOrdner(karten, lernstandAusText(text), Date.now())))
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    faelligZaehlen();
+    let zeit = 0;
+    let aktiv = true;
+    let abmelden: (() => void) | undefined;
+    listen("schule-geaendert", () => {
+      window.clearTimeout(zeit);
+      zeit = window.setTimeout(faelligZaehlen, 3000);
+    }).then((f) => (aktiv ? (abmelden = f) : f()));
+    // einmal pro Stunde: Karten werden mit der Zeit fällig
+    const stuendlich = window.setInterval(faelligZaehlen, 3600_000);
+    return () => {
+      aktiv = false;
+      abmelden?.();
+      window.clearTimeout(zeit);
+      window.clearInterval(stuendlich);
+    };
+  }, [faelligZaehlen]);
+  /** fällige Karten eines Ordners einschließlich seiner Unterordner */
+  const faelligIn = (name: string | null) => (faellig ? faelligAnzeige(faellig, name) : 0);
+  const karteiSchliessen = useCallback(() => {
+    setKartei(null);
+    faelligZaehlen();
+  }, [faelligZaehlen]);
 
   // Fehler aus dem Editor (z. B. Datei konnte nicht eingefügt werden)
   useEffect(() => {
@@ -362,6 +401,14 @@ function App() {
         ...(name.includes("/") || name === "Claude" || name === "Gerettet"
           ? []
           : [{ titel: "Neuer Unterordner", aktion: () => setUnterordnerFuer(name) }]),
+        ...(name === "Claude" || name === "Gerettet"
+          ? []
+          : [
+              {
+                titel: faelligIn(name) ? `Karteikarten lernen (${faelligIn(name)} fällig)` : "Karteikarten lernen",
+                aktion: () => setKartei({ ordner: name, titel: alleOrdner.find((o) => o.name === name)?.titel ?? name }),
+              },
+            ]),
         { titel: "Ordner als PDF / drucken …", aktion: () => druckeOrdner(name) },
         {
           titel: name.includes("/") ? "Unterordner in den Papierkorb …" : "Ordner in den Papierkorb …",
@@ -467,14 +514,15 @@ function App() {
   // Menüpunkte aus der Mac-Menüleiste (⌘N, ⌥⌘S) – wirken auch, wenn eine Grafik den Fokus hat
   const menueRef = useRef<(id: string) => void>(() => {});
   menueRef.current = (id) => {
-    // Solange eine Rückfrage offen ist, keine Menübefehle (⌘N, ⌘K …) dahinter ausführen
-    if (rueckfrageRef.current) return;
+    // Solange eine Rückfrage oder das Lernen offen ist, keine Menübefehle (⌘N, ⌘K …) dahinter ausführen
+    if (rueckfrageRef.current || karteiRef.current) return;
     if (id === "neue-notiz") neueNotiz();
     if (id === "ordner-leiste") toggleSidebar();
     if (id === "suchen") setSucheOffen(true);
     if (id === "versionen" && aktiveDatei) setVersionenOffen(true);
     if (id === "sichern") jetztSichern();
     if (id === "hilfe") setHilfeOffen(true);
+    if (id === "karten") setKartei(ordner ? { ordner: ordner.name, titel: ordner.titel } : { ordner: null, titel: "alle Ordner" });
     if (id === "drucken" && ordner && aktiveDatei) druckeNotizen([{ ordner: ordner.name, datei: aktiveDatei }]);
   };
   useEffect(() => {
@@ -578,6 +626,9 @@ function App() {
         onHilfe={() => setHilfeOffen(true)}
         unterordnerFuer={unterordnerFuer}
         onNeuerUnterordner={neuerUnterordner}
+        onNotizAblegen={(von, datei, ziel) => verschieben(von, datei, ziel)}
+        faellig={faelligIn}
+        onLernen={() => setKartei({ ordner: null, titel: "alle Ordner" })}
         onUnterordnerAbbrechen={() => {
           setUnterordnerFuer(null);
           requestAnimationFrame(fokusSidebar);
@@ -642,6 +693,7 @@ function App() {
         />
       )}
       {hilfeOffen && <Hilfe onSchliessen={() => setHilfeOffen(false)} />}
+      {kartei && <Kartei ordner={kartei.ordner} titel={kartei.titel} onSchliessen={karteiSchliessen} onFehler={melde} />}
       {menue && <Kontextmenue key={menue.nr} x={menue.x} y={menue.y} eintraege={menue.eintraege} onSchliessen={menueSchliessen} />}
       {rueckfrage && (
         <Rueckfrage

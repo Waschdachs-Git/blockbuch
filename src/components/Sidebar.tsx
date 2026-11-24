@@ -1,5 +1,6 @@
 import { useRef, useState, type Ref } from "react";
 import type { Ordner } from "../lernfelder";
+import { NOTIZ_ZIEHEN } from "./NoteList";
 
 type Props = {
   ref?: Ref<HTMLElement>;
@@ -17,6 +18,11 @@ type Props = {
   unterordnerFuer: string | null;
   onNeuerUnterordner: (eltern: string, name: string) => Promise<boolean>;
   onUnterordnerAbbrechen: () => void;
+  /** Notiz wurde auf einen Ordner gezogen */
+  onNotizAblegen: (von: string, datei: string, ziel: string) => void;
+  /** fällige Karteikarten in einem Ordner (mit Unterordnern); null = alle */
+  faellig: (ordner: string | null) => number;
+  onLernen: () => void;
   /** Hinweis unten, z. B. "Gesichert heute, 10:42" */
   sicherung: string | null;
   /** Zusatzinfo als Tooltip (z. B. nicht mitgesicherte Projektordner) */
@@ -37,6 +43,9 @@ export function Sidebar({
   unterordnerFuer,
   onNeuerUnterordner,
   onUnterordnerAbbrechen,
+  onNotizAblegen,
+  faellig,
+  onLernen,
   sicherung,
   sicherungHinweis,
 }: Props) {
@@ -44,6 +53,10 @@ export function Sidebar({
   const [neuerOrdner, setNeuerOrdner] = useState<string | null>(null);
   const legtAn = useRef(false);
   const alle = [...lernfelder, ...faecher];
+  // Ordner, über dem gerade eine Notiz schwebt (Hervorhebung)
+  const [ablageZiel, setAblageZiel] = useState<string | null>(null);
+  const kannAblegen = (o: Ordner, e: React.DragEvent) =>
+    e.dataTransfer.types.includes(NOTIZ_ZIEHEN) && o.name !== aktiv && o.name !== "Claude" && o.name !== "Gerettet";
 
   function setRefs(el: HTMLElement | null) {
     navRef.current = el;
@@ -106,7 +119,25 @@ export function Sidebar({
       <li key={o.name}>
         <button
           data-ordner={o.name}
-          className={`sidebar__eintrag ${o.eltern ? "sidebar__eintrag--unter" : ""} ${istAktiv ? "ist-aktiv" : ""}`}
+          className={`sidebar__eintrag ${o.eltern ? "sidebar__eintrag--unter" : ""} ${istAktiv ? "ist-aktiv" : ""} ${ablageZiel === o.name ? "ist-ablageziel" : ""}`}
+          onDragOver={(e) => {
+            if (!kannAblegen(o, e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            if (ablageZiel !== o.name) setAblageZiel(o.name);
+          }}
+          onDragLeave={() => setAblageZiel((z) => (z === o.name ? null : z))}
+          onDrop={(e) => {
+            setAblageZiel(null);
+            if (!kannAblegen(o, e)) return;
+            e.preventDefault();
+            try {
+              const { ordner: von, datei } = JSON.parse(e.dataTransfer.getData(NOTIZ_ZIEHEN)) as { ordner: string; datei: string };
+              if (von !== o.name) onNotizAblegen(von, datei, o.name);
+            } catch {
+              /* keine Notiz */
+            }
+          }}
           aria-current={istAktiv ? "true" : undefined}
           tabIndex={istAktiv ? 0 : -1}
           title={o.titel}
@@ -122,6 +153,11 @@ export function Sidebar({
             <OrdnerIcon />
           </span>
           <span className="sidebar__name">{o.anzeige}</span>
+          {faellig(o.name) > 0 && (
+            <span className="sidebar__faellig" title={`${faellig(o.name)} Karteikarten fällig – Rechtsklick → lernen`}>
+              {faellig(o.name)}
+            </span>
+          )}
         </button>
       </li>,
       unterordnerEingabe(o, liste),
@@ -185,6 +221,9 @@ export function Sidebar({
             {sicherung}
           </div>
         )}
+        <button className="sidebar__lernen" onClick={onLernen} title="Karteikarten aus allen Ordnern lernen">
+          🗂 Lernen{faellig(null) > 0 ? ` (${faellig(null)})` : ""}
+        </button>
         <button className="sidebar__hilfe" onClick={onHilfe} title="Hilfe (⌘ß)" aria-label="Hilfe">
           ?
         </button>

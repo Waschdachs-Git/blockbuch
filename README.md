@@ -65,6 +65,11 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 - Git-Sicherung beim Start, alle 5 Minuten, beim Beenden und mit ⌘S, mit Versionsverlauf über ⇧⌘H
 - Grafiken laufen in einer Sandbox: kein Netzwerk, kein Zugriff auf die App, Start erst per Klick
 
+**Lernen**
+- Karteikarten aus den `[!karten]`-Kästen (`Frage :: Antwort`, z. B. von Claude mit `/karten`), verteiltes
+  Wiederholen wie bei Anki: 1 Nochmal · 2 Schwer · 3 Gut · 4 Leicht; Vorlesen per 🔊
+- Fällige Karten als Zahl neben jedem Ordner; Lernstand in `~/Schule/.blockbuch/lernstand.json`
+
 **Ordnen und Exportieren**
 - Unterordner in Lernfeldern und Fächern (z. B. `LF5/Unicode`), Notizen per Rechtsklick verschieben –
   Bilder und PDFs wandern mit
@@ -84,6 +89,7 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 | ⌘K | Suchen |
 | ⌘S | Jetzt sichern |
 | ⌘P | Drucken / als PDF sichern |
+| ⇧⌘K | Karteikarten lernen (Leertaste: Antwort, 1–4: bewerten) |
 | ⇧⌘H | Versionen der Notiz |
 | ⌥⌘S | Ordner-Leiste ein/aus |
 | ⇧⌘U / ⇧⌘L | Marker ❓ / 🙋 |

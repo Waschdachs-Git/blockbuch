@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type Ref } from "react";
 import type { Ordner } from "../lernfelder";
 import { datumAnzeigen, type NotizInfo } from "../api";
 
+/** Datentyp beim Ziehen einer Notiz auf einen Ordner in der Seitenleiste */
+export const NOTIZ_ZIEHEN = "application/x-blockbuch-notiz";
+
 type Props = {
   ref?: Ref<HTMLElement>;
   ordner: Ordner;
@@ -127,6 +130,12 @@ export function NoteList(props: Props) {
                     tabIndex={istAktiv || (!aktiveDatei && n === notizen[0]) ? 0 : -1}
                     onClick={() => props.onAuswahl(n.datei)}
                     onDoubleClick={() => props.onUmbenennenStart(n.datei)}
+                    // Auf einen Ordner links ziehen = verschieben
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(NOTIZ_ZIEHEN, JSON.stringify({ ordner: ordner.name, datei: n.datei }));
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       e.currentTarget.focus();

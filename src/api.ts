@@ -23,6 +23,9 @@ export type SicherungsStand = { zeit: string | null; fehler: string | null; hinw
 /** Vom Dateibeobachter gemeldet (Ereignis "schule-geaendert") */
 export type Aenderung = { ordner: string | null; datei: string | null };
 
+/** Karteikarte aus einem [!karten]-Kasten (Frage :: Antwort) */
+export type Karte = { id: string; frage: string; antwort: string; ordner: string; datei: string; titel: string };
+
 export const api = {
   schuleOeffnen: (standardOrdner: string[]) => invoke<SchuleInfo>("schule_oeffnen", { standardOrdner }),
   ordnerErstellen: (name: string) => invoke<string[]>("ordner_erstellen", { name }),
@@ -64,6 +67,10 @@ export const api = {
   unterordnerErstellen: (eltern: string, name: string) => invoke<string[]>("unterordner_erstellen", { eltern, name }),
   /** Notiz in einen anderen Ordner verschieben (Bilder/PDFs werden mitkopiert) */
   notizVerschieben: (ordner: string, datei: string, ziel: string) => invoke<NotizInfo>("notiz_verschieben", { ordner, datei, ziel }),
+  /** Karteikarten eines Ordners (mit Unterordnern) oder – ohne Ordner – aller Ordner */
+  kartenSammeln: (ordner: string | null) => invoke<Karte[]>("karten_sammeln", { ordner }),
+  lernstandLesen: () => invoke<string>("lernstand_lesen"),
+  lernstandSchreiben: (inhalt: string) => invoke<void>("lernstand_schreiben", { inhalt }),
   /** Notizen und übrige Dateien (assets/, Unterordner) in einem Ordner */
   ordnerInhalt: (ordner: string) => invoke<{ notizen: number; dateien: number }>("ordner_inhalt", { ordner }),
 };

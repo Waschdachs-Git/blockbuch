@@ -36,6 +36,7 @@ const KUERZEL: [abschnitt: string, Kuerzel[]][] = [
       ["⌘K", "Suchen – auch mit Tippfehlern, in PDFs, mit lf2 oder #tag"],
       ["⌘S", "Sofort sichern"],
       ["⌘P", "Notiz drucken oder als PDF sichern (im Druckdialog unten links)"],
+      ["⇧⌘K", "Karteikarten des Ordners lernen"],
       ["⇧⌘H", "Ältere Versionen der Notiz ansehen und zurückholen"],
       ["⌘+ / ⌘− / ⌘0", "Ansicht vergrößern / verkleinern / zurücksetzen"],
       ["⌘ß", "Diese Hilfe (die Taste mit dem „?“)"],
@@ -151,6 +152,24 @@ export function Hilfe({ onSchliessen }: { onSchliessen: () => void }) {
               AirDrop schicken und hineinziehen. Bei PDFs erscheinen die Knöpfe,
               wenn du mit der Maus darüberfährst.
             </p>
+          </section>
+
+          <section>
+            <h3>Karteikarten</h3>
+            <p>
+              Karten stehen in einem Kasten <code>&gt; [!karten]</code>, eine pro Zeile:{" "}
+              <code>Frage :: Antwort</code> – Claude legt sie mit <code>/karten</code> an. Lernen: ⇧⌘K,
+              Rechtsklick auf einen Ordner oder „🗂 Lernen“ unten links. Die Zahl neben einem Ordner zeigt,
+              wie viele Karten heute dran sind.
+            </p>
+            <Tabelle
+              zeilen={[
+                ["Leertaste", "Antwort zeigen"],
+                ["1 / 2 / 3 / 4", "Nochmal / Schwer / Gut / Leicht – was du gut kannst, kommt seltener"],
+                ["🔊", "Frage oder Antwort vorlesen"],
+                ["Esc", "Lernen beenden (der Fortschritt ist gespeichert)"],
+              ]}
+            />
           </section>
 
           <section>

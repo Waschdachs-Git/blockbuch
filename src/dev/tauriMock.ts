@@ -27,6 +27,7 @@ const slug = (t: string) =>
     .replace(/[^A-Za-z0-9]+/g, "-")
     .replace(/^-|-$/g, "") || "Notiz";
 
+let lernstand = "{}";
 const info = (datei: string, c: string) => ({
   datei,
   titel: /^# (.*)$/m.exec(c)?.[1] ?? datei,
@@ -203,6 +204,32 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
       delete fs[a.ordner][a.datei];
       return info(a.datei, inhalt);
     }
+    case "karten_sammeln": {
+      const karten = [];
+      for (const [o, dateien] of Object.entries(fs)) {
+        if (a.ordner && o !== a.ordner && !o.startsWith(`${a.ordner}/`)) continue;
+        for (const [d, inhalt] of Object.entries(dateien)) {
+          if (!d.endsWith(".md") || d.includes("/")) continue;
+          let imKasten = false;
+          for (const zeile of inhalt.split("\n")) {
+            const t = zeile.trim();
+            if (!t.startsWith(">")) { imKasten = false; continue; }
+            const z = t.slice(1).trim();
+            if (/^\[!karten\]/i.test(z)) { imKasten = true; continue; }
+            const [frage, ...rest] = z.split("::");
+            if (imKasten && rest.length && frage.trim() && rest.join("::").trim()) {
+              karten.push({ id: frage.trim(), frage: frage.trim(), antwort: rest.join("::").trim(), ordner: o, datei: d, titel: info(d, inhalt).titel });
+            }
+          }
+        }
+      }
+      return karten;
+    }
+    case "lernstand_lesen":
+      return lernstand;
+    case "lernstand_schreiben":
+      lernstand = a.inhalt;
+      return null;
     case "ordner_inhalt": {
       const namen = Object.keys(fs[a.ordner] ?? {});
       return { notizen: namen.filter((n) => n.endsWith(".md") && !n.includes("/")).length, dateien: namen.filter((n) => n.includes("/")).length };

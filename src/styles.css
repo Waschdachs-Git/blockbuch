@@ -1362,8 +1362,11 @@ button {
 .sidebar__sicherung {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
   font-size: 11px;
   color: var(--text-leise);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* "?" unten rechts in der Ordner-Leiste: öffnet die Hilfe */
@@ -1965,4 +1968,218 @@ button {
   .kasten--achtung .druck__etikett {
     background: var(--achtung-rand);
   }
+}
+
+/* Notiz wird auf einen Ordner gezogen */
+.sidebar__eintrag.ist-ablageziel {
+  outline: 2px solid var(--akzent);
+  outline-offset: -2px;
+  background: var(--bg-aktiv);
+}
+
+/* ---------- Karteikarten lernen (karten/Kartei.tsx) ---------- */
+
+.kartei {
+  width: min(680px, 100%);
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--linie);
+  border-radius: 14px;
+  background: var(--bg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  outline: none;
+}
+
+.kartei__kopf {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px 10px 22px;
+  border-bottom: 1px solid var(--linie);
+}
+
+.kartei__kopf h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+}
+
+.kartei__zaehler {
+  font-size: 12px;
+  color: var(--text-leise);
+}
+
+.kartei__karte {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 28px 22px;
+  overflow-y: auto;
+}
+
+.kartei__seite {
+  position: relative;
+  padding: 22px 48px 22px 24px;
+  border: 1px solid var(--linie);
+  border-radius: 12px;
+  background: var(--bg-liste);
+}
+
+.kartei__seite--antwort {
+  border-color: var(--akzent);
+  background: var(--merke-bg, var(--bg-liste));
+}
+
+.kartei__frage,
+.kartei__antwort {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.kartei__frage {
+  font-weight: 600;
+}
+
+.kartei__frage code,
+.kartei__antwort code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--code-bg);
+  font-size: 0.9em;
+}
+
+.kartei__vorlesen {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.kartei__vorlesen:hover {
+  opacity: 1;
+}
+
+.kartei__aufdecken {
+  align-self: center;
+  padding: 10px 22px;
+  border: 1px solid var(--akzent);
+  border-radius: 999px;
+  background: var(--akzent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kartei__aufdecken kbd {
+  margin-left: 6px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.kartei__quelle {
+  margin: -6px 0 0;
+  font-size: 12px;
+  color: var(--text-leise);
+}
+
+.kartei__bewertung {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.kartei__note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 9px 6px;
+  border: 1px solid var(--linie);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kartei__note small {
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-leise);
+}
+
+.kartei__note kbd {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.kartei__note--1:hover { border-color: #c4314b; }
+.kartei__note--2:hover { border-color: #d98a2b; }
+.kartei__note--3:hover { border-color: #3a9a5b; }
+.kartei__note--4:hover { border-color: var(--akzent); }
+
+.kartei__ende {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 28px 28px;
+  text-align: center;
+}
+
+.kartei__gross {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.kartei__hinweis {
+  margin: 0;
+  padding: 0 28px;
+  color: var(--text-leise);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.kartei__hinweis code {
+  margin: 0 3px;
+}
+
+/* Zahl fälliger Karten in der Ordner-Leiste */
+.sidebar__faellig {
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--akzent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.sidebar__lernen {
+  flex: none;
+  padding: 2px 9px;
+  border: 1px solid var(--linie);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-leise);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sidebar__lernen:hover {
+  color: var(--text);
+  background: var(--bg-hover);
 }
