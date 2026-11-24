@@ -51,14 +51,26 @@ pub fn pruefe_ordner(ordner: &str) -> Ergebnis<()> {
             if unter.eq_ignore_ascii_case("assets") {
                 return Err("„assets“ ist für Bilder und PDFs reserviert.".into());
             }
+            if ist_geschuetzt(oben) {
+                return Err(format!("In „{oben}“ gibt es keine Unterordner."));
+            }
             Ok(())
         }
         _ => Err(format!("Ungültiger Ordner: „{ordner}“")),
     }
 }
 
+/// Claude/ und Gerettet/ (auch "claude" – APFS unterscheidet Groß/Klein nicht)
+fn ist_geschuetzt(ordner: &str) -> bool {
+    ordner.eq_ignore_ascii_case(CLAUDE_ORDNER) || ordner.eq_ignore_ascii_case("Gerettet")
+}
+
 pub fn ordner_pfad(root: &Path, ordner: &str) -> Ergebnis<PathBuf> {
     pruefe_ordner(ordner)?;
+    // Code-Projekte mit eigenem Git sind keine Unterordner (zeigt die Ordner-Leiste auch nicht)
+    if ordner.contains('/') && root.join(ordner).join(".git").exists() {
+        return Err(format!("„{ordner}“ ist ein Projektordner, kein Notizordner."));
+    }
     let pfad = root.join(ordner);
     if !pfad.is_dir() {
         return Err(format!("Ordner „{ordner}“ gibt es nicht mehr."));
@@ -439,7 +451,7 @@ pub fn unterordner_erstellen(root: &Path, eltern: &str, name: &str) -> Ergebnis<
     if eltern.contains('/') {
         return Err("Unterordner gehen nur eine Ebene tief.".into());
     }
-    if eltern == CLAUDE_ORDNER || eltern == "Gerettet" {
+    if ist_geschuetzt(eltern) {
         return Err(format!("In „{eltern}“ kann man keine Unterordner anlegen."));
     }
     let pfad = format!("{eltern}/{name}");
@@ -459,51 +471,63 @@ pub fn unterordner_erstellen(root: &Path, eltern: &str, name: &str) -> Ergebnis<
 /// Notiz in einen anderen Ordner verschieben. Bilder, PDFs und Grafiken, auf die sie verweist
 /// (assets/…), werden in den assets/-Ordner des Ziels kopiert – das Original bleibt, falls andere
 /// Notizen es auch nutzen. Gibt es dort schon eine andere Datei mit dem Namen, bekommt die Kopie
-/// einen freien Namen und der Verweis in der Notiz wird angepasst. Überschreibt nie etwas.
+/// einen freien Namen und genau dieser Verweis in der Notiz wird angepasst. Überschreibt nie etwas.
+/// Das Feld `lernfeld:` im Kopf der Notiz passt sich dem Zielordner an.
 pub fn notiz_verschieben(root: &Path, ordner: &str, datei: &str, ziel: &str) -> Ergebnis<NotizInfo> {
     let quelle = notiz_pfad(root, ordner, datei)?;
     if !quelle.is_file() {
         return Err(format!("„{datei}“ gibt es nicht mehr."));
     }
+    if ist_geschuetzt(ziel.split('/').next().unwrap_or(ziel)) {
+        return Err(format!("In „{ziel}“ kann man keine Notizen verschieben."));
+    }
     let ziel_p = ordner_pfad(root, ziel)?;
     if ziel_p == ordner_pfad(root, ordner)? {
         return Err("Die Notiz liegt schon in diesem Ordner.".into());
     }
-    if ziel == CLAUDE_ORDNER || ziel == "Gerettet" {
-        return Err(format!("In „{ziel}“ kann man keine Notizen verschieben."));
-    }
-    let mut inhalt = fs::read_to_string(&quelle).map_err(fehler)?;
+    let inhalt = fs::read_to_string(&quelle).map_err(fehler)?;
     let quell_assets = ordner_pfad(root, ordner)?.join("assets");
     let ziel_assets = ziel_p.join("assets");
+
+    // 1. Dateien kopieren, Umbenennungen sammeln
+    let mut umbenannt: Vec<(String, String)> = Vec::new(); // (alter Verweis, neuer Verweis)
     for verweis in asset_verweise(&inhalt) {
         let name = &verweis["assets/".len()..];
         let Ok(alt) = asset_pfad(root, ordner, &verweis) else { continue }; // fehlt schon – nichts zu tun
         fs::create_dir_all(&ziel_assets).map_err(fehler)?;
+        let ist_pdf = name.to_lowercase().ends_with(".pdf");
+        let txt_name = |n: &str| format!("{}.txt", &n[..n.len() - 4]);
         let mut neu_name = name.to_string();
         let ziel_datei = ziel_assets.join(name);
         if ziel_datei.exists() {
-            if fs::read(&ziel_datei).ok() != fs::read(&alt).ok() {
-                let (stamm, endung) = name.rsplit_once('.').unwrap_or((name, ""));
-                neu_name = (2..1000)
-                    .map(|i| if endung.is_empty() { format!("{stamm}-{i}") } else { format!("{stamm}-{i}.{endung}") })
-                    .find(|n| !ziel_assets.join(n).exists())
-                    .ok_or("Kein freier Dateiname gefunden.")?;
-                fs::copy(&alt, ziel_assets.join(&neu_name)).map_err(fehler)?;
-                inhalt = inhalt.replace(&verweis, &format!("assets/{neu_name}"));
+            if fs::read(&ziel_datei).ok() == fs::read(&alt).ok() {
+                continue; // dieselbe Datei liegt schon da
             }
-        } else {
-            fs::copy(&alt, &ziel_datei).map_err(fehler)?;
+            let (stamm, endung) = name.rsplit_once('.').unwrap_or((name, ""));
+            // frei muss auch die .txt daneben sein (bei PDFs), sonst zeigt die Suche fremden Text
+            neu_name = (2..1000)
+                .map(|i| if endung.is_empty() { format!("{stamm}-{i}") } else { format!("{stamm}-{i}.{endung}") })
+                .find(|n| !ziel_assets.join(n).exists() && !(ist_pdf && ziel_assets.join(txt_name(n)).exists()))
+                .ok_or("Kein freier Dateiname gefunden.")?;
+            umbenannt.push((verweis.clone(), format!("assets/{neu_name}")));
         }
+        fs::copy(&alt, ziel_assets.join(&neu_name)).map_err(fehler)?;
         // Text eines PDFs (für Suche und Claude) mitnehmen
-        if neu_name.to_lowercase().ends_with(".pdf") {
-            let txt = quell_assets.join(format!("{}.txt", &name[..name.len() - 4]));
-            let txt_ziel = ziel_assets.join(format!("{}.txt", &neu_name[..neu_name.len() - 4]));
+        if ist_pdf {
+            let txt = quell_assets.join(txt_name(name));
+            let txt_ziel = ziel_assets.join(txt_name(&neu_name));
             if txt.is_file() && !txt_ziel.exists() {
                 let _ = fs::copy(&txt, &txt_ziel);
             }
         }
     }
-    // Ziel-Dateiname: gleicher Name, sonst freier Name – erst schreiben, dann das Original löschen
+
+    // 2. Notiz anpassen: genau die Verweise ersetzen (in einem Durchgang), Lernfeld im Kopf
+    let mut inhalt = verweise_ersetzen(&inhalt, &umbenannt);
+    let oben = ziel.split('/').next().unwrap_or(ziel);
+    inhalt = lernfeld_setzen(&inhalt, crate::suche::lernfeld_nummer(oben).map(|n| format!("LF{n:02}")).as_deref());
+
+    // 3. Erst schreiben, dann das Original löschen – gleicher Name im Ziel: freier Name
     let stamm = datei.trim_end_matches(".md");
     let neu = if ziel_p.join(datei).exists() { freier_dateiname(&ziel_p, stamm) } else { datei.to_string() };
     let ziel_notiz = ziel_p.join(&neu);
@@ -512,6 +536,60 @@ pub fn notiz_verschieben(root: &Path, ordner: &str, datei: &str, ziel: &str) -> 
     f.sync_all().map_err(fehler)?;
     fs::remove_file(&quelle).map_err(fehler)?;
     lies_info(&ziel_notiz)
+}
+
+/// Verweise ersetzen – nur echte Link-/Bildziele und `src:`-Zeilen, jeweils das ganze Ziel
+/// (nicht "assets/a.png" in "assets/a.png.bak" oder in einem Text)
+fn verweise_ersetzen(inhalt: &str, umbenannt: &[(String, String)]) -> String {
+    if umbenannt.is_empty() {
+        return inhalt.to_string();
+    }
+    let neu_fuer = |v: &str| umbenannt.iter().find(|(alt, _)| alt == v.trim_start_matches("./")).map(|(_, neu)| neu.clone());
+    let mut aus = String::with_capacity(inhalt.len());
+    for zeile in inhalt.split_inclusive('\n') {
+        // ```pdf / ```grafik: "src: assets/x.pdf"
+        if let Some(wert) = zeile.trim_start().strip_prefix("src:") {
+            if let Some(neu) = neu_fuer(wert.trim()) {
+                let einrueckung = &zeile[..zeile.len() - zeile.trim_start().len()];
+                let ende = if zeile.ends_with('\n') { "\n" } else { "" };
+                aus.push_str(&format!("{einrueckung}src: {neu}{ende}"));
+                continue;
+            }
+        }
+        // Bilder und Links: ](assets/x.png) oder ](<assets/x y.png>)
+        let mut rest = zeile;
+        while let Some(i) = rest.find("](") {
+            aus.push_str(&rest[..i + 2]);
+            rest = &rest[i + 2..];
+            let (ziel, spitz) = match rest.strip_prefix('<') {
+                Some(r) => (r.find('>').map(|e| &r[..e]), true),
+                None => (rest.find([')', ' ']).map(|e| &rest[..e]), false),
+            };
+            if let Some(neu) = ziel.and_then(neu_fuer) {
+                let laenge = ziel.unwrap().len() + if spitz { 2 } else { 0 };
+                aus.push_str(&if spitz { format!("<{neu}>") } else { neu });
+                rest = &rest[laenge..];
+            }
+        }
+        aus.push_str(rest);
+    }
+    aus
+}
+
+/// `lernfeld:` im Kopf der Notiz auf den Zielordner setzen (Fach: Zeile entfernen). Ohne Kopf: unverändert.
+fn lernfeld_setzen(inhalt: &str, lernfeld: Option<&str>) -> String {
+    let Some(rest) = inhalt.strip_prefix("---\n") else { return inhalt.to_string() };
+    let Some(ende) = rest.find("\n---") else { return inhalt.to_string() };
+    let (kopf, danach) = rest.split_at(ende);
+    let mut zeilen: Vec<String> = kopf.lines().filter(|z| !z.trim_start().starts_with("lernfeld:")).map(String::from).collect();
+    if let Some(lf) = lernfeld {
+        zeilen.insert(0, format!("lernfeld: {lf}"));
+    }
+    if zeilen.is_empty() {
+        format!("---{danach}")
+    } else {
+        format!("---\n{}{danach}", zeilen.join("\n"))
+    }
 }
 
 /// Alle Verweise einer Notiz auf eigene Dateien: ![…](assets/x.png), ![…](<assets/x y.png>),
@@ -810,7 +888,7 @@ pub fn ordner_inhalt(root: &Path, ordner: &str) -> Ergebnis<OrdnerInhalt> {
             let Ok(art) = e.file_type() else { continue };
             if art.is_dir() {
                 zaehle(&e.path(), tiefe + 1, notizen, dateien);
-            } else if tiefe == 0 && name.ends_with(".md") && !name.starts_with('.') {
+            } else if tiefe <= 1 && name.ends_with(".md") && !name.starts_with('.') && !pfad.ends_with("assets") {
                 *notizen += 1;
             } else {
                 *dateien += 1;
@@ -900,6 +978,56 @@ mod tests {
         // gleicher Ordner / Claude: nicht erlaubt
         assert!(notiz_verschieben(&root, "LF05-Daten/Unicode", &info.datei, "LF05-Daten/Unicode").is_err());
         assert!(notiz_verschieben(&root, "LF05-Daten/Unicode", &info.datei, CLAUDE_ORDNER).is_err());
+    }
+
+    #[test]
+    fn verschieben_ersetzt_genau_die_richtigen_verweise() {
+        let (_t, root) = testordner();
+        fs::create_dir_all(root.join("LF9/assets")).unwrap();
+        fs::create_dir_all(root.join("LF05-Daten/assets")).unwrap();
+        let q = root.join("LF05-Daten/assets");
+        fs::write(q.join("a.png"), b"A").unwrap();
+        fs::write(q.join("a-2.png"), b"A2").unwrap();
+        fs::write(q.join("a.png.bak"), b"BAK").unwrap();
+        fs::write(q.join("b.pdf"), b"%PDF-B").unwrap();
+        fs::write(q.join("b.txt"), b"Text B").unwrap();
+        // im Ziel: anderes a.png, anderes b.pdf und eine fremde b-2.txt
+        fs::write(root.join("LF9/assets/a.png"), b"ANDERS").unwrap();
+        fs::write(root.join("LF9/assets/b.pdf"), b"%PDF-X").unwrap();
+        fs::write(root.join("LF9/assets/b-2.txt"), b"fremd").unwrap();
+        let inhalt = "---\nlernfeld: LF05\ndatum: 2026-10-08\n---\n# N\n![1](assets/a.png) ![2](assets/a-2.png) ![3](assets/a.png.bak)\nText `assets/a.png` bleibt.\n```pdf\nsrc: assets/b.pdf\n```\n";
+        fs::write(root.join("LF05-Daten/2026-10-08-N.md"), inhalt).unwrap();
+        let info = notiz_verschieben(&root, "LF05-Daten", "2026-10-08-N.md", "LF9").unwrap();
+        let neu = fs::read_to_string(root.join("LF9").join(&info.datei)).unwrap();
+        // a.png wurde umbenannt (a-2.png gibt es nach dem Kopieren noch nicht im Ziel – aber a-2.png kommt auch)
+        let bild1 = neu.split("![1](").nth(1).unwrap().split(')').next().unwrap().to_string();
+        let bild2 = neu.split("![2](").nth(1).unwrap().split(')').next().unwrap().to_string();
+        assert_ne!(bild1, bild2, "zwei Bilder dürfen nicht auf dieselbe Datei zeigen: {neu}");
+        assert_eq!(fs::read(root.join("LF9").join(&bild1)).unwrap(), b"A");
+        assert_eq!(fs::read(root.join("LF9").join(&bild2)).unwrap(), b"A2");
+        assert!(neu.contains("![3](assets/a.png.bak)"), "längerer Name unverändert: {neu}");
+        assert!(neu.contains("Text `assets/a.png` bleibt."), "Text außerhalb von Verweisen bleibt");
+        // PDF umbenannt, und zwar so, dass auch die .txt frei ist
+        let pdf = neu.split("src: ").nth(1).unwrap().lines().next().unwrap().to_string();
+        assert_ne!(pdf, "assets/b-2.pdf", "b-2.txt ist schon belegt");
+        assert_eq!(fs::read(root.join("LF9").join(&pdf)).unwrap(), b"%PDF-B");
+        assert_eq!(fs::read(root.join("LF9").join(pdf.replace(".pdf", ".txt"))).unwrap(), b"Text B");
+        assert_eq!(fs::read(root.join("LF9/assets/b-2.txt")).unwrap(), b"fremd");
+        // Lernfeld im Kopf angepasst
+        assert!(neu.starts_with("---\nlernfeld: LF09\ndatum: 2026-10-08\n---"), "{neu}");
+    }
+
+    #[test]
+    fn verschieben_in_fach_entfernt_lernfeld_und_schuetzt_claude() {
+        let (_t, root) = testordner();
+        fs::create_dir_all(root.join("Deutsch")).unwrap();
+        fs::create_dir_all(root.join(CLAUDE_ORDNER)).unwrap();
+        fs::write(root.join("LF05-Daten/2026-10-08-N.md"), "---\nlernfeld: LF05\n---\n# N\n").unwrap();
+        assert!(notiz_verschieben(&root, "LF05-Daten", "2026-10-08-N.md", "claude").is_err());
+        assert!(notiz_verschieben(&root, "LF05-Daten", "2026-10-08-N.md", "Claude/commands").is_err());
+        assert!(unterordner_erstellen(&root, "claude", "x").is_err());
+        let info = notiz_verschieben(&root, "LF05-Daten", "2026-10-08-N.md", "Deutsch").unwrap();
+        assert_eq!(fs::read_to_string(root.join("Deutsch").join(info.datei)).unwrap(), "---\n---\n# N\n");
     }
 
     #[test]

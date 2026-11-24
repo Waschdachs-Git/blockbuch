@@ -423,6 +423,12 @@ pub fn run() {
                         .accelerator("CmdOrCtrl+Shift+H")
                         .build(h)?,
                 )
+                .separator()
+                .item(
+                    &MenuItemBuilder::with_id("drucken", "Drucken / als PDF sichern …")
+                        .accelerator("CmdOrCtrl+P")
+                        .build(h)?,
+                )
                 .build()?;
             let darstellung = SubmenuBuilder::new(h, "Darstellung")
                 .item(

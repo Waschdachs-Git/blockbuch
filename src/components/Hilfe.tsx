@@ -11,7 +11,7 @@ const KUERZEL: [abschnitt: string, Kuerzel[]][] = [
       ["⌘N", "Neue Notiz im aktuellen Ordner"],
       ["↩ (in der Notizliste)", "Notiz umbenennen"],
       ["⌘⌫ (in der Notizliste)", "Notiz in den Papierkorb"],
-      ["Rechtsklick", "Menü für Notiz oder Ordner"],
+      ["Rechtsklick", "Notiz: umbenennen, verschieben, drucken, löschen · Ordner: Unterordner, als PDF, löschen"],
       ["← → ↑ ↓", "Zwischen Ordnern, Notizen und Text wechseln"],
       ["Esc (im Text)", "Zurück zur Notizliste"],
       ["⌥⌘S", "Ordner-Leiste ein-/ausblenden (Text wird breiter)"],
@@ -35,6 +35,7 @@ const KUERZEL: [abschnitt: string, Kuerzel[]][] = [
     [
       ["⌘K", "Suchen – auch mit Tippfehlern, in PDFs, mit lf2 oder #tag"],
       ["⌘S", "Sofort sichern"],
+      ["⌘P", "Notiz drucken oder als PDF sichern (im Druckdialog unten links)"],
       ["⇧⌘H", "Ältere Versionen der Notiz ansehen und zurückholen"],
       ["⌘+ / ⌘− / ⌘0", "Ansicht vergrößern / verkleinern / zurücksetzen"],
       ["⌘ß", "Diese Hilfe (die Taste mit dem „?“)"],
@@ -149,6 +150,16 @@ export function Hilfe({ onSchliessen }: { onSchliessen: () => void }) {
               <kbd>⌘V</kbd> (geht mit derselben Apple-ID automatisch) – oder per
               AirDrop schicken und hineinziehen. Bei PDFs erscheinen die Knöpfe,
               wenn du mit der Maus darüberfährst.
+            </p>
+          </section>
+
+          <section>
+            <h3>Unterordner und Export</h3>
+            <p>
+              Rechtsklick auf einen Ordner → „Neuer Unterordner“, z. B. LF5 → Unicode. Notizen bringst du
+              per Rechtsklick → „Verschieben nach …“ dorthin – Bilder und PDFs kommen mit.
+              „Ordner als PDF / drucken …“ macht aus allen Notizen eines Ordners (mit Unterordnern) ein
+              Dokument mit Deckblatt, älteste zuerst – praktisch als Lernskript vor einer LK.
             </p>
           </section>
 

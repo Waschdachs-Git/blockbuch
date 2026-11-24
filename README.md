@@ -65,6 +65,12 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 - Git-Sicherung beim Start, alle 5 Minuten, beim Beenden und mit ⌘S, mit Versionsverlauf über ⇧⌘H
 - Grafiken laufen in einer Sandbox: kein Netzwerk, kein Zugriff auf die App, Start erst per Klick
 
+**Ordnen und Exportieren**
+- Unterordner in Lernfeldern und Fächern (z. B. `LF5/Unicode`), Notizen per Rechtsklick verschieben –
+  Bilder und PDFs wandern mit
+- Drucken oder als PDF sichern (⌘P), ein ganzer Ordner als ein Dokument mit Deckblatt (Lernskript);
+  PDF-Arbeitsblätter werden als Seiten mitgedruckt, Kästen aufgeklappt
+
 **Finden**
 - Volltextsuche mit ⌘K, die Umlaute toleriert (`ueber` findet `über`) und Tippfehler verzeiht
   (`Primerschlüsel` findet `Primärschlüssel`)
@@ -77,6 +83,7 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 | ⌘N | Neue Notiz |
 | ⌘K | Suchen |
 | ⌘S | Jetzt sichern |
+| ⌘P | Drucken / als PDF sichern |
 | ⇧⌘H | Versionen der Notiz |
 | ⌥⌘S | Ordner-Leiste ein/aus |
 | ⇧⌘U / ⇧⌘L | Marker ❓ / 🙋 |

@@ -10,7 +10,8 @@ import { Hilfe } from "./components/Hilfe";
 import { Kontextmenue, Rueckfrage, type MenueEintrag } from "./components/Kontextmenue";
 import { useStoredState } from "./useStoredState";
 import { ASSETS_GEAENDERT } from "./editor/grafikBlock";
-import { api, fehlerText, heute, type Aenderung, type NotizInfo, type SicherungsStand, type Treffer } from "./api";
+import { drucken, type DruckNotiz } from "./druck";
+import { api, datumAnzeigen, fehlerText, heute, type Aenderung, type NotizInfo, type SicherungsStand, type Treffer } from "./api";
 
 function App() {
   const [ordnerNamen, setOrdnerNamen] = useState<string[] | null>(null);
@@ -27,9 +28,12 @@ function App() {
   const [sicherung, setSicherung] = useState<SicherungsStand | null>(null);
   const [hilfeOffen, setHilfeOffen] = useState(false);
   const [unterordnerFuer, setUnterordnerFuer] = useState<string | null>(null);
-  const [menue, setMenue] = useState<{ x: number; y: number; eintraege: MenueEintrag[] } | null>(null);
+  // nr: jedes Menü neu aufbauen (Untermenü „Verschieben nach …“ an derselben Stelle: Fokus und Position neu)
+  const [menue, setMenueZustand] = useState<{ nr: number; x: number; y: number; eintraege: MenueEintrag[] } | null>(null);
+  const menueNr = useRef(0);
+  const setMenue = (m: { x: number; y: number; eintraege: MenueEintrag[] }) => setMenueZustand({ ...m, nr: ++menueNr.current });
   const [rueckfrage, setRueckfrage] = useState<{ titel: string; text: string; ja: string; onJa: () => void } | null>(null);
-  const menueSchliessen = useCallback(() => setMenue(null), []);
+  const menueSchliessen = useCallback(() => setMenueZustand(null), []);
   const rueckfrageRef = useRef(rueckfrage);
   rueckfrageRef.current = rueckfrage;
   // Notiz, die nach einem Ordnerwechsel (aus der Suche) ausgewählt werden soll
@@ -47,7 +51,11 @@ function App() {
 
   const { lernfelder, faecher } = useMemo(() => ordnerAusNamen(ordnerNamen ?? []), [ordnerNamen]);
   const alleOrdner = [...lernfelder, ...faecher];
-  const ordner = alleOrdner.find((o) => o.name === aktiverOrdner) ?? alleOrdner[0];
+  // Ist der gemerkte Unterordner verschwunden (gelöscht, von außen umbenannt): zum Ordner darüber
+  const ordner =
+    alleOrdner.find((o) => o.name === aktiverOrdner) ??
+    alleOrdner.find((o) => o.name === aktiverOrdner.split("/")[0]) ??
+    alleOrdner[0];
 
   const melde = useCallback((e: unknown) => setMeldung(fehlerText(e)), []);
 
@@ -257,9 +265,48 @@ function App() {
           titel: "Verschieben nach …",
           aktion: () => verschiebenMenue(datei, x, y),
         },
+        { titel: "Drucken / als PDF …", kuerzel: "⌘P", aktion: () => druckeNotizen([{ ordner: ordner!.name, datei }]) },
         { titel: "In den Papierkorb", kuerzel: "⌘⌫", gefaehrlich: true, aktion: () => loeschen(datei) },
       ],
     });
+  }
+
+  /** Druckansicht bauen und den Druckdialog öffnen (dort unten links: „Als PDF sichern“) */
+  async function druckeNotizen(liste: DruckNotiz[], titel?: { ueberschrift: string; unterzeile: string }) {
+    if (liste.length === 0) {
+      melde("In diesem Ordner gibt es noch keine Notizen.");
+      return;
+    }
+    setStatusText(liste.length > 1 ? `${liste.length} Notizen werden vorbereitet …` : "Druck wird vorbereitet …");
+    try {
+      await editorRef.current?.speichernJetzt(); // gedruckt wird, was auf der Platte steht
+      await drucken(liste, titel);
+    } catch (e) {
+      melde(e);
+    } finally {
+      setStatusText((t) => (t?.endsWith("vorbereitet …") ? null : t));
+    }
+  }
+
+  /** Ganzer Ordner (mit Unterordnern) als ein Dokument, älteste Notiz zuerst – z. B. als Lernskript */
+  async function druckeOrdner(name: string) {
+    try {
+      const ordnerListe = alleOrdner.filter((o) => o.name === name || o.eltern === name);
+      const liste: DruckNotiz[] = [];
+      for (const o of ordnerListe) {
+        const notizenImOrdner = await api.notizenAuflisten(o.name);
+        notizenImOrdner
+          .sort((a, b) => a.datum.localeCompare(b.datum) || a.titel.localeCompare(b.titel, "de"))
+          .forEach((n) => liste.push({ ordner: o.name, datei: n.datei }));
+      }
+      const o = alleOrdner.find((x) => x.name === name);
+      await druckeNotizen(liste, {
+        ueberschrift: o?.titel ?? name,
+        unterzeile: `${liste.length === 1 ? "1 Notiz" : `${liste.length} Notizen`} · Stand ${datumAnzeigen(heute())}`,
+      });
+    } catch (e) {
+      melde(e);
+    }
   }
 
   /** Zweites Menü: alle Ordner und Unterordner als Ziel (außer dem eigenen und Claude/Gerettet) */
@@ -315,6 +362,7 @@ function App() {
         ...(name.includes("/") || name === "Claude" || name === "Gerettet"
           ? []
           : [{ titel: "Neuer Unterordner", aktion: () => setUnterordnerFuer(name) }]),
+        { titel: "Ordner als PDF / drucken …", aktion: () => druckeOrdner(name) },
         {
           titel: name.includes("/") ? "Unterordner in den Papierkorb …" : "Ordner in den Papierkorb …",
           gefaehrlich: true,
@@ -345,7 +393,9 @@ function App() {
       onJa: async () => {
         // aktuellerOrdnerRef statt `ordner`: Der Rechtsklick hat den Ordner gerade erst gewechselt.
         // Der Dialog bleibt bis zum Ende offen – so tippt niemand in eine Notiz, deren Ordner gleich weg ist.
-        const istOffen = name === aktuellerOrdnerRef.current;
+        // auch offen, wenn gerade einer seiner Unterordner angezeigt wird
+        const offen = aktuellerOrdnerRef.current ?? "";
+        const istOffen = offen === name || offen.startsWith(`${name}/`);
         try {
           if (istOffen) await editorRef.current?.speichernJetzt();
           const liste = await api.ordnerLoeschen(name);
@@ -425,6 +475,7 @@ function App() {
     if (id === "versionen" && aktiveDatei) setVersionenOffen(true);
     if (id === "sichern") jetztSichern();
     if (id === "hilfe") setHilfeOffen(true);
+    if (id === "drucken" && ordner && aktiveDatei) druckeNotizen([{ ordner: ordner.name, datei: aktiveDatei }]);
   };
   useEffect(() => {
     let aktiv = true;
@@ -591,7 +642,7 @@ function App() {
         />
       )}
       {hilfeOffen && <Hilfe onSchliessen={() => setHilfeOffen(false)} />}
-      {menue && <Kontextmenue x={menue.x} y={menue.y} eintraege={menue.eintraege} onSchliessen={menueSchliessen} />}
+      {menue && <Kontextmenue key={menue.nr} x={menue.x} y={menue.y} eintraege={menue.eintraege} onSchliessen={menueSchliessen} />}
       {rueckfrage && (
         <Rueckfrage
           titel={rueckfrage.titel}

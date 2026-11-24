@@ -9,6 +9,7 @@
     "core:default",
     "core:window:allow-start-dragging",
     "opener:default",
-    "core:webview:allow-set-webview-zoom"
+    "core:webview:allow-set-webview-zoom",
+    "core:webview:allow-print"
   ]
 }

@@ -25,7 +25,7 @@ function pdfjs(): Promise<PdfJs> {
   return pdfjsLaden;
 }
 
-async function oeffnen(daten: Uint8Array) {
+export async function oeffnen(daten: Uint8Array) {
   const lib = await pdfjs();
   return lib.getDocument({
     data: daten,
