@@ -620,6 +620,19 @@ button {
   cursor: col-resize;
 }
 
+/* Markierte Zellen (Farbe aus der Tabellen-Leiste, gespeichert als <!-- markiert: … --> über der Tabelle).
+   Halbdurchsichtig – passt auf hell und dunkel; auch die Kopfzeile lässt sich färben */
+.inhalt [data-farbe="gelb"] { background: rgba(250, 204, 21, 0.32); }
+.inhalt [data-farbe="gruen"] { background: rgba(58, 154, 91, 0.26); }
+.inhalt [data-farbe="rot"] { background: rgba(214, 60, 80, 0.24); }
+.inhalt [data-farbe="blau"] { background: rgba(70, 130, 230, 0.24); }
+
+.inhalt td[data-farbe],
+.inhalt th[data-farbe] {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
 .inhalt .selectedCell::after {
   content: "";
   position: absolute;
@@ -1818,6 +1831,45 @@ button {
 
 .tabellen-leiste button.ist-gefaehrlich:hover {
   color: #c4314b;
+}
+
+.tabellen-leiste button[hidden] {
+  display: none;
+}
+
+.tabellen-leiste button.ist-wichtig {
+  color: var(--akzent);
+  font-weight: 600;
+}
+
+/* Trennstrich vor „+ Zeile“: links Zellen (verbinden, färben), rechts Zeilen und Spalten */
+.tabellen-leiste button.ist-abschnitt {
+  margin-left: 4px;
+  box-shadow: -3px 0 0 -2px var(--linie);
+}
+
+.tabellen-leiste button.tabellen-leiste__farbe {
+  width: 20px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.tabellen-leiste__farbe::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.tabellen-leiste__farbe--gelb::before { background: #facc15; }
+.tabellen-leiste__farbe--gruen::before { background: #3a9a5b; }
+.tabellen-leiste__farbe--rot::before { background: #d63c50; }
+.tabellen-leiste__farbe--blau::before { background: #4682e6; }
+
+.tabellen-leiste button.tabellen-leiste__ohne {
+  padding: 2px 5px;
 }
 
 /* Unterordner in der Ordner-Leiste: eingerückt, etwas kleiner */

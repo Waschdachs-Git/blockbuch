@@ -212,6 +212,12 @@ export function Hilfe({ onSchliessen }: { onSchliessen: () => void }) {
               nächsten Zelle – in der letzten Zelle entsteht eine neue Zeile.
               Spalten ziehst du am Spaltenrand breiter oder schmaler.
             </p>
+            <p>
+              <strong>Zellen verbinden:</strong> mit der Maus über mehrere Zellen ziehen (oder ⇧ + Pfeiltasten),
+              dann „Verbinden“ in der Leiste. „Trennen“ teilt sie wieder. <strong>Hervorheben:</strong> Zelle
+              anklicken oder mehrere markieren und einen Farbpunkt wählen (gelb, grün, rot, blau) – ⊘ nimmt die
+              Farbe weg.
+            </p>
             <Tabelle
               zeilen={[
                 ["⌥⌘↓ / ⌥⌘↑", "Zeile darunter / darüber einfügen"],

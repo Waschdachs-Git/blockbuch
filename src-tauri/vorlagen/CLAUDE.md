@@ -199,10 +199,19 @@ PDF-Blöcke (```` ```pdf ````).
 **Nicht verwenden:** HTML (`<details>`, `<br>` …), Fußnoten, Unterstreichen, `===`-Überschriften.
 Notizen mit HTML öffnet die App nur schreibgeschützt.
 
-Einzige Ausnahme: Eine Zeile wie `<!-- spalten: 160 320 0 -->` direkt über einer Tabelle speichert
-die Spaltenbreiten, die der Nutzer in der App gezogen hat. Sie gehört zur Tabelle – **nicht löschen
-und nicht von der Tabelle trennen**. Fügst du eine Spalte hinzu, hänge eine `0` (= automatisch) an
-der passenden Stelle an. Selbst brauchst du sie nicht zu schreiben.
+Einzige Ausnahme: Kommentarzeilen direkt über einer Tabelle speichern, was der Nutzer in der App
+eingestellt hat. Sie gehören zur Tabelle – **nicht löschen und nicht von der Tabelle trennen**:
+
+- `<!-- spalten: 160 320 0 -->` = Spaltenbreiten (0 = automatisch). Fügst du eine Spalte hinzu, hänge
+  eine `0` an der passenden Stelle an.
+- `<!-- verbunden: A2:B2 C3:C4 -->` = verbundene Zellen (Namen wie in Excel: Spalte A, B, C …, Zeile 1 =
+  Kopfzeile). Der Text steht in der Zelle oben links, die anderen Zellen des Bereichs bleiben leer –
+  **nichts hineinschreiben**.
+- `<!-- markiert: gelb B2 C2 rot A4 -->` = farbig hervorgehobene Zellen (gelb, gruen, rot, blau).
+
+Fügst du in so einer Tabelle Zeilen oder Spalten ein, verschieben sich die Zellnamen – passe die
+Angaben an (oder lass die Tabelle besser unverändert und schreib in einen Claude-Kasten darunter).
+Selbst schreiben musst du diese Zeilen nicht; hervorheben darfst du nur, wenn der Nutzer darum bittet.
 
 ## Versionen (Git)
 

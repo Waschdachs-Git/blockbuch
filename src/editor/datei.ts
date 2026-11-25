@@ -117,6 +117,11 @@ export function setzeZusammen(d: NotizDatei, text: string): string {
   return d.bom + inhalt;
 }
 
+/** Kommentarzeilen direkt über einer Tabelle (spalten / verbunden / markiert). Nur genau diese Form –
+ *  ein eigener Kommentar wie <!-- markiert: noch Quellen prüfen --> zählt nicht dazu */
+export const TABELLEN_KOMMENTAR =
+  /<!--[ \t]*(?:spalten:[\d. \t]*|verbunden:(?:[ \t]*[A-Za-z]+\d+:[A-Za-z]+\d+)*[ \t]*|markiert:(?:[ \t,;·]*(?:gelb|gr(?:ü|ue)n|rot|blau|[A-Za-z]+\d+))*[ \t,;·]*)-->/gi;
+
 /** Alle Buchstaben und Ziffern eines Textes – zum Vergleich, ob beim Umwandeln Inhalt verloren geht */
 function zeichen(text: string): string {
   return (text.match(/[\p{L}\p{N}]/gu) ?? []).join("");
@@ -128,7 +133,7 @@ function zeichen(text: string): string {
 export function wuerdeInhaltVerlieren(original: string, zurueck: string): boolean {
   // Spaltenbreiten-Kommentar über Tabellen (tabelle.ts): fällt er weg (z. B. "0 0" oder keine Tabelle
   // mehr darunter), gehen nur Breiten verloren, kein Text – deshalb nicht schreibgeschützt öffnen
-  const a = zeichen(original.replace(/<!--[ \t]*spalten:[^>]*-->/gi, ""));
+  const a = zeichen(original.replace(TABELLEN_KOMMENTAR, ""));
   const b = zeichen(zurueck);
   let j = 0;
   for (const c of a) {

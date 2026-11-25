@@ -9,7 +9,7 @@ import { SichererCodeBlock } from "./codeBlock";
 import { Kaesten } from "./kaesten";
 import { KeineGeerbteFormatierung, SicheresFett, SicheresKursiv } from "./formatierung";
 import { Wortvorschlag } from "./wortvorschlag";
-import { TabelleMitBreiten } from "./tabelle";
+import { KopfzelleMitFarbe, TabelleMitBreiten, ZelleMitFarbe } from "./tabelle";
 import { BildMitAssets, Dateiablage } from "./dateiablage";
 
 export function editorErweiterungen(): Extensions {
@@ -24,8 +24,10 @@ export function editorErweiterungen(): Extensions {
     TaskList,
     TaskItem.configure({ nested: true }),
     // Tabelle selbst mit ziehbaren Spaltenbreiten (gespeichert als Kommentar über der Tabelle, tabelle.ts)
-    TableKit.configure({ table: false }),
+    TableKit.configure({ table: false, tableCell: false, tableHeader: false }),
     TabelleMitBreiten,
+    ZelleMitFarbe,
+    KopfzelleMitFarbe,
     BildMitAssets,
     Dateiablage,
     Placeholder.configure({

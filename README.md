@@ -38,7 +38,7 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 
 **Schreiben**
 - Editor mit Überschriften, Listen, Checklisten, Tabellen (Leiste zum Einfügen/Löschen von Zeilen und
-  Spalten, Spaltenbreite per Maus ziehbar) und
+  Spalten, Spaltenbreite per Maus ziehbar, Zellen verbinden und farbig hervorheben) und
   Code-Blöcken mit Syntax-Hervorhebung
 - `/`-Menü zum Einfügen von Blöcken und Formatieren, alles auch ohne Maus bedienbar
 - Eingebaute Hilfe (⌘ß, Menü „Hilfe“ oder „?“ in der Ordner-Leiste)
