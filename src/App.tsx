@@ -743,7 +743,7 @@ function App() {
           onFehler={melde}
         />
       )}
-      {kartei && <Kartei ordner={kartei.ordner} titel={kartei.titel} onSchliessen={karteiSchliessen} onFehler={melde} />}
+      {kartei && <Kartei ordner={kartei.ordner} onSchliessen={karteiSchliessen} onFehler={melde} />}
       {menue && <Kontextmenue key={menue.nr} x={menue.x} y={menue.y} eintraege={menue.eintraege} onSchliessen={menueSchliessen} />}
       {rueckfrage && (
         <Rueckfrage

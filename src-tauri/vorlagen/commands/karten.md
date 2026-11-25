@@ -21,4 +21,7 @@ Regeln:
 ```
 
 - Gibt es schon einen `[!karten]`-Kasten: neue Karten **in diesen Kasten** anhängen, keine doppelten.
+  Gibt es mehrere mit Titel (Gruppen, z. B. `> [!karten] Protokolle`): jede Karte in die passende Gruppe.
+- Wünscht der Nutzer Gruppen („teil die Karten nach Themen auf“): je Thema ein Kasten mit kurzem Titel
+  (`> [!karten] OSI-Modell`), alle am Ende der Notiz, getrennt durch eine Leerzeile.
 - Antworte im Chat mit der Anzahl und 2–3 Beispielen.

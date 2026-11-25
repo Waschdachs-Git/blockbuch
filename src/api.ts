@@ -24,7 +24,7 @@ export type SicherungsStand = { zeit: string | null; fehler: string | null; hinw
 export type Aenderung = { ordner: string | null; datei: string | null };
 
 /** Karteikarte aus einem [!karten]-Kasten (Frage :: Antwort) */
-export type Karte = { id: string; frage: string; antwort: string; ordner: string; datei: string; titel: string };
+export type Karte = { id: string; frage: string; antwort: string; ordner: string; datei: string; titel: string; /** Titel des Karten-Kastens, sonst "" */ gruppe: string };
 
 export const api = {
   schuleOeffnen: (standardOrdner: string[]) => invoke<SchuleInfo>("schule_oeffnen", { standardOrdner }),

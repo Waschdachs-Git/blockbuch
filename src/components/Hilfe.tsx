@@ -151,7 +151,8 @@ export function Hilfe({ onSchliessen }: { onSchliessen: () => void }) {
               <kbd>⌘V</kbd> ein – auch Screenshots. Fotos vom iPhone (Tafelbild):
               Auf dem iPhone das Foto öffnen, „Kopieren“ tippen, dann am Mac{" "}
               <kbd>⌘V</kbd> (geht mit derselben Apple-ID automatisch) – oder per
-              AirDrop schicken und hineinziehen. Bei PDFs erscheinen die Knöpfe,
+              AirDrop schicken und hineinziehen. PDFs zeigen immer eine ganze Seite –
+              blättern mit ‹ › darunter, oder „Alle Seiten“ untereinander. Die übrigen Knöpfe erscheinen,
               wenn du mit der Maus darüberfährst.
             </p>
           </section>
@@ -170,16 +171,25 @@ export function Hilfe({ onSchliessen }: { onSchliessen: () => void }) {
             <h3>Karteikarten</h3>
             <p>
               Karten stehen in einem Kasten <code>&gt; [!karten]</code>, eine pro Zeile:{" "}
-              <code>Frage :: Antwort</code> – Claude legt sie mit <code>/karten</code> an. Lernen: ⇧⌘K,
-              Rechtsklick auf einen Ordner oder „🗂 Lernen“ unten links. Die Zahl neben einem Ordner zeigt,
-              wie viele Karten heute dran sind.
+              <code>Frage :: Antwort</code> – Claude legt sie mit <code>/karten</code> an. Öffnen: ⇧⌘K,
+              Rechtsklick auf einen Ordner oder „🗂 Lernen“ unten links. Die Übersicht zeigt deine Stapel:
+              Ordner → Notizen → Gruppen. Eine Gruppe ist ein Kasten mit Titel, z. B.{" "}
+              <code>&gt; [!karten] Protokolle</code>.
+            </p>
+            <p>
+              <strong>Lernen</strong> = die Karten, die heute nach Plan dran sind. <strong>Frei üben</strong> =
+              alle Karten gemischt, so oft du willst – dein Plan bleibt gleich. <strong>Schwierige</strong> = nur
+              Karten, die du schon vergessen hast oder die noch nicht sitzen.
             </p>
             <Tabelle
               zeilen={[
+                ["↑ ↓ → ←", "Übersicht: auswählen, auf- und zuklappen"],
+                ["↩ / F / S", "Lernen / Frei üben / Schwierige"],
                 ["Leertaste", "Antwort zeigen"],
-                ["1 / 2 / 3 / 4", "Nochmal / Schwer / Gut / Leicht – was du gut kannst, kommt seltener"],
+                ["1 / 2 / 3 / 4", "Lernen: Nochmal / Schwer / Gut / Leicht – was du gut kannst, kommt seltener"],
+                ["1 / 2", "Frei üben: Wusste ich nicht / Wusste ich"],
                 ["🔊", "Frage oder Antwort vorlesen"],
-                ["Esc", "Lernen beenden (der Fortschritt ist gespeichert)"],
+                ["Esc", "Zurück zur Übersicht, dort: schließen (der Fortschritt ist gespeichert)"],
               ]}
             />
           </section>

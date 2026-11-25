@@ -54,7 +54,9 @@ function knopf(text: string, titel: string, aktion: () => void) {
 export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number | undefined): NodeView {
   let aktuell = node;
   const ordner = grafikOrdner();
+  // eine Seite auf einmal (ganz sichtbar, blättern mit ‹ ›) – oder alle untereinander
   let alleSeiten = false;
+  let seite = 1;
   let geladenFuer = "";
   let pdf: Awaited<ReturnType<typeof oeffnen>> | null = null;
   let zerstoert = false;
@@ -69,13 +71,8 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
   leiste.contentEditable = "false";
   const name = document.createElement("span");
   name.className = "grafik__name";
-  const seitenKnopf = knopf("", "Alle Seiten zeigen", () => {
-    alleSeiten = !alleSeiten;
-    seitenAufbauen();
-  });
   leiste.append(
     name,
-    seitenKnopf,
     knopf("↗ Vorschau", "In der Mac-App Vorschau öffnen (markieren, unterschreiben)", () => {
       const { src } = grafikAngaben(aktuell.textContent);
       if (src) api.inVorschauOeffnen(ordner, src).catch((e) => meldeFehler(e));
@@ -97,12 +94,54 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
   seiten.className = "pdf__seiten";
   seiten.contentEditable = "false";
 
+  // Fenster größer geworden: gezeichnete Seiten schärfer neu zeichnen (sonst sind sie hochgezogen)
+  let groesserTimer = 0;
+  const groesse = new ResizeObserver(() => {
+    window.clearTimeout(groesserTimer);
+    groesserTimer = window.setTimeout(() => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      seiten.querySelectorAll<HTMLCanvasElement>(".pdf__seite[data-gezeichnet]").forEach((c) => {
+        if (c.clientWidth * dpr > c.width * 1.1) {
+          delete c.dataset.gezeichnet;
+          zeichneSeite(c);
+        }
+      });
+    }, 250);
+  });
+  groesse.observe(seiten);
+
+  // Blättern unter dem PDF (nur bei mehr als einer Seite)
+  const blaettern = document.createElement("div");
+  blaettern.className = "pdf__blaettern";
+  blaettern.contentEditable = "false";
+  blaettern.hidden = true;
+  const zurueck = knopf("‹", "Vorherige Seite", () => blaettere(-1));
+  const weiter = knopf("›", "Nächste Seite", () => blaettere(1));
+  const seitenzahl = document.createElement("span");
+  seitenzahl.className = "pdf__seitenzahl";
+  seitenzahl.setAttribute("aria-live", "polite");
+  const alleKnopf = knopf("", "Alle Seiten untereinander zeigen", () => {
+    alleSeiten = !alleSeiten;
+    seitenAufbauen();
+    if (!alleSeiten) dom.scrollIntoView({ block: "nearest" });
+  });
+  alleKnopf.classList.add("pdf__alle");
+  blaettern.append(zurueck, seitenzahl, weiter, alleKnopf);
+
+  function blaettere(um: number) {
+    if (!pdf) return;
+    const neu = Math.min(pdf.numPages, Math.max(1, seite + um));
+    if (neu === seite) return;
+    seite = neu;
+    seitenAufbauen();
+  }
+
   const quelle = document.createElement("pre");
   quelle.className = "grafik__quelle";
   const code = document.createElement("code");
   quelle.append(code);
   quelle.hidden = true;
-  dom.append(leiste, seiten, quelle);
+  dom.append(leiste, seiten, blaettern, quelle);
 
   function meldeFehler(e: unknown) {
     window.dispatchEvent(new CustomEvent("blockbuch:fehler", { detail: fehlerText(e) }));
@@ -117,17 +156,20 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
     leinwand.dataset.gezeichnet = "1";
     beobachter.unobserve(leinwand);
     try {
-      const seite = await pdf.getPage(Number(leinwand.dataset.seite));
-      const breite = seiten.clientWidth || 640;
-      const basis = seite.getViewport({ scale: 1 });
+      const blatt = await pdf.getPage(Number(leinwand.dataset.seite));
+      if (!leinwand.isConnected) return;
+      const basis = blatt.getViewport({ scale: 1 });
+      // Größe kommt aus dem CSS (ganze Seite sichtbar) – erst das Verhältnis setzen, dann messen
+      leinwand.style.setProperty("--verhaeltnis", String(basis.width / basis.height));
+      leinwand.style.aspectRatio = `${basis.width} / ${basis.height}`;
+      const breite = leinwand.clientWidth || seiten.clientWidth || 640;
       // höchstens doppelte Auflösung – sonst braucht ein 50-Seiten-PDF Hunderte MB
       const scale = (breite / basis.width) * Math.min(window.devicePixelRatio || 1, 2);
-      const viewport = seite.getViewport({ scale });
+      const viewport = blatt.getViewport({ scale });
       leinwand.width = viewport.width;
       leinwand.height = viewport.height;
-      leinwand.style.aspectRatio = `${basis.width} / ${basis.height}`;
-      await seite.render({ canvas: leinwand, viewport }).promise;
-      seite.cleanup();
+      await blatt.render({ canvas: leinwand, viewport }).promise;
+      blatt.cleanup();
     } catch (e) {
       leinwand.dataset.fehler = fehlerText(e);
     }
@@ -143,18 +185,25 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
         const v = s.getViewport({ scale: 1 });
         seiten.querySelectorAll<HTMLCanvasElement>(".pdf__seite:not([data-gezeichnet])").forEach((c) => {
           c.style.aspectRatio = `${v.width} / ${v.height}`;
+          c.style.setProperty("--verhaeltnis", String(v.width / v.height));
         });
       })
       .catch(() => {});
-    const anzahl = alleSeiten ? pdf.numPages : 1;
-    seitenKnopf.textContent = pdf.numPages > 1 ? (alleSeiten ? "Nur Seite 1" : `Alle ${pdf.numPages} Seiten`) : "1 Seite";
-    seitenKnopf.disabled = pdf.numPages <= 1;
+    const n = pdf.numPages;
+    seite = Math.min(seite, n);
+    blaettern.hidden = n <= 1;
+    zurueck.hidden = weiter.hidden = seitenzahl.hidden = alleSeiten;
+    zurueck.disabled = seite <= 1;
+    weiter.disabled = seite >= n;
+    seitenzahl.textContent = `Seite ${seite} von ${n}`;
+    alleKnopf.textContent = alleSeiten ? "Einzeln blättern" : `Alle ${n} Seiten`;
     beobachter.disconnect();
-    const leinwaende = Array.from({ length: anzahl }, (_, i) => {
+    const nummern = alleSeiten ? Array.from({ length: n }, (_, i) => i + 1) : [seite];
+    const leinwaende = nummern.map((nr) => {
       const c = document.createElement("canvas");
       c.className = "pdf__seite";
-      c.dataset.seite = String(i + 1);
-      c.setAttribute("aria-label", `Seite ${i + 1}`);
+      c.dataset.seite = String(nr);
+      c.setAttribute("aria-label", `Seite ${nr} von ${n}`);
       beobachter.observe(c);
       return c;
     });
@@ -183,6 +232,7 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
         return;
       }
       pdf = neu;
+      seite = 1;
       seitenAufbauen();
     } catch (e) {
       hinweis(`PDF konnte nicht angezeigt werden: ${fehlerText(e)}`);
@@ -206,7 +256,7 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
       laden();
       return true;
     },
-    stopEvent: (e) => leiste.contains(e.target as Node) || seiten.contains(e.target as Node),
+    stopEvent: (e) => leiste.contains(e.target as Node) || seiten.contains(e.target as Node) || blaettern.contains(e.target as Node),
     ignoreMutation: (m) => {
       if (m.type === "selection") return false;
       return m.type === "attributes" || !code.contains(m.target);
@@ -214,6 +264,8 @@ export function pdfNodeView(node: PMNode, editor: Editor, getPos: () => number |
     destroy: () => {
       zerstoert = true;
       beobachter.disconnect();
+      groesse.disconnect();
+      window.clearTimeout(groesserTimer);
       editor.off("transaction", angabenZeigen);
       pdf?.loadingTask.destroy();
     },

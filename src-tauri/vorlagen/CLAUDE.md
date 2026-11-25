@@ -94,6 +94,9 @@ Ergänzungen schreibst du **nur in Claude-Kästen**:
 - `> [!karten]` = Karteikarten, eine pro Zeile `> Frage :: Antwort` (kein `::` in Frage/Antwort,
   Code nur als `Inline`). Neue Karten **an den vorhandenen** Karten-Kasten anhängen. Der Karten-Kasten
   steht immer **am Ende** der Notiz (nach „Kurz zusammengefasst“).
+  Ein Titel hinter der Kennung (`> [!karten] Protokolle`) ist eine **Gruppe**, die der Nutzer in der App
+  einzeln lernen kann. Gibt es mehrere Karten-Kästen mit Titel: neue Karten in den passenden hängen.
+  Titel des Nutzers nicht ändern; eigene Gruppen nur, wenn er darum bittet.
 
 ## Bilder und PDFs
 

@@ -8,7 +8,9 @@ type Fs = Record<string, Record<string, string>>;
 // Startdaten wie beim Nutzer: eigene Lernfeld-Ordner LF1–LF5 und Fächer
 const fs: Fs = {
   LF1: {},
-  LF2: {},
+  LF2: {
+    "2026-11-02-Topologien.md": "---\nlernfeld: LF02\ndatum: 2026-11-02\ntags: []\n---\n\n# Topologien\n\n> [!karten]\n> Was ist eine Stern-Topologie? :: Alle Geräte hängen an einem zentralen Switch\n> Was ist der Durchmesser? :: Längster kürzester Weg zwischen zwei Knoten\n",
+  },
   LF3: {},
   LF4: {},
   Deutsch: {},
@@ -16,7 +18,7 @@ const fs: Fs = {
   "Mathe-IT": {},
   Wirtschaftskunde: {},
   LF5: {
-    "2026-10-06-SQL-Joins.md": "---\nlernfeld: LF05\ndatum: 2026-10-06\ntags: []\n---\n\n# SQL-Joins\n\n- INNER JOIN\n",
+    "2026-10-06-SQL-Joins.md": "---\nlernfeld: LF05\ndatum: 2026-10-06\ntags: []\n---\n\n# SQL-Joins\n\n- INNER JOIN\n\n> [!karten] Joins\n> Was liefert ein INNER JOIN? :: Nur Zeilen, die in beiden Tabellen passen\n> Was liefert ein LEFT JOIN? :: Alle Zeilen links, rechts NULL wenn nichts passt\n\n> [!karten] Schlüssel\n> Was ist ein Primärschlüssel? :: Eindeutige Kennung einer Zeile\n> Was ist ein Fremdschlüssel? :: Verweis auf den Primärschlüssel einer anderen Tabelle\n",
   },
 };
 
@@ -212,14 +214,15 @@ async function invoke(cmd: string, a: any, optionen?: { headers?: Record<string,
         for (const [d, inhalt] of Object.entries(dateien)) {
           if (!d.endsWith(".md") || d.includes("/")) continue;
           let imKasten = false;
+          let gruppe = "";
           for (const zeile of inhalt.split("\n")) {
             const t = zeile.trim();
             if (!t.startsWith(">")) { imKasten = false; continue; }
             const z = t.slice(1).trim();
-            if (/^\[!karten\]/i.test(z)) { imKasten = true; continue; }
+            if (/^\[!karten\]/i.test(z)) { imKasten = true; gruppe = z.slice(9).replace(/^[-+]/, "").trim(); continue; }
             const [frage, ...rest] = z.split("::");
             if (imKasten && rest.length && frage.trim() && rest.join("::").trim()) {
-              karten.push({ id: frage.trim(), frage: frage.trim(), antwort: rest.join("::").trim(), ordner: o, datei: d, titel: info(d, inhalt).titel });
+              karten.push({ id: frage.trim(), frage: frage.trim(), antwort: rest.join("::").trim(), ordner: o, datei: d, titel: info(d, inhalt).titel, gruppe });
             }
           }
         }

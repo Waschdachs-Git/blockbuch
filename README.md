@@ -67,7 +67,9 @@ arbeiten. Blockbuch zeigt Änderungen von außen sofort an.
 
 **Lernen**
 - Karteikarten aus den `[!karten]`-Kästen (`Frage :: Antwort`, z. B. von Claude mit `/karten`), verteiltes
-  Wiederholen wie bei Anki: 1 Nochmal · 2 Schwer · 3 Gut · 4 Leicht; Vorlesen per 🔊
+  Wiederholen wie bei Anki: 1 Nochmal · 2 Schwer · 3 Gut · 4 Leicht; Vorlesen per 🔊. Übersicht mit
+  Stapeln (Ordner → Notiz → Gruppe = Kastentitel `> [!karten] Protokolle`), „Frei üben“ und „Schwierige“
+  ohne Einfluss auf den Plan
 - Fällige Karten als Zahl neben jedem Ordner; Lernstand in `~/Schule/.blockbuch/lernstand.json`
 - LK-Planer: Leistungskontrollen eintragen, Blockbuch verteilt den Stoff bis zum Vortag (Notizen,
   Karteikarten, Wiederholung); `/lk` lässt Claude eine Probe-LK mit eingeklappten Lösungen schreiben

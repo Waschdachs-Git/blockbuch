@@ -314,6 +314,17 @@ export function EditorPane({ ref, ordner, datei, version, onGespeichert, onZurue
   // Beim Schließen der Ansicht nichts verlieren
   useEffect(() => () => void sichernVorWeggang(), [editor]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sichtbare Höhe der Notiz als CSS-Variable: Eine PDF-Seite passt immer ganz hinein (pdfBlock.ts)
+  useEffect(() => {
+    const f = flaecheRef.current;
+    if (!f) return;
+    const messen = () => f.clientHeight > 0 && f.style.setProperty("--flaeche-hoehe", `${f.clientHeight}px`);
+    messen();
+    const ro = new ResizeObserver(messen);
+    ro.observe(f);
+    return () => ro.disconnect();
+  }, []);
+
   /** Erste Fundstelle eines der Wörter markieren und hinscrollen. Sucht pro Absatz über den ganzen Text
    *  (auch über Formatierungsgrenzen wie **SQL**-Joins) und mit der Umlaut-Regel der Suche. */
   function springe(woerter: string[]) {

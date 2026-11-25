@@ -1153,18 +1153,52 @@ button {
   display: block;
   padding: 8px;
   background: var(--code-bg);
-  max-height: 80vh;
-  overflow-y: auto;
 }
 
+/* Jede Seite passt ganz in die sichtbare Notiz: so breit wie möglich, aber höchstens so hoch wie
+   die Fläche (--flaeche-hoehe setzt EditorPane, --verhaeltnis = Breite/Höhe setzt pdfBlock.ts) */
 .pdf__seite {
   display: block;
-  width: 100%;
+  --seite-hoehe: calc(var(--flaeche-hoehe, 90vh) - 96px);
+  width: min(100%, calc(var(--seite-hoehe) * var(--verhaeltnis, 0.7071)));
   height: auto;
+  margin: 0 auto;
   aspect-ratio: 210 / 297; /* A4, bis das echte Format bekannt ist */
   background: #fff;
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* Blättern unter dem PDF: ‹ Seite 2 von 5 › · Alle Seiten */
+.pdf__blaettern {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-leise);
+  user-select: none;
+}
+
+.pdf__blaettern[hidden] {
+  display: none;
+}
+
+.pdf__blaettern .grafik__knopf {
+  min-width: 30px;
+  font-size: 15px;
+}
+
+.pdf__blaettern .pdf__alle {
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.pdf__seitenzahl {
+  min-width: 110px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .pdf__seite + .pdf__seite {
@@ -2154,6 +2188,134 @@ button {
 
 .kartei__hinweis code {
   margin: 0 3px;
+}
+
+/* Übersicht: Ordner → Notizen → Gruppen */
+.kartei__liste {
+  flex: 1;
+  min-height: 120px;
+  margin: 0;
+  padding: 6px 10px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.kartei__zeile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.kartei__zeile--oben {
+  font-weight: 600;
+}
+
+.kartei__zeile:hover {
+  background: var(--code-bg);
+}
+
+.kartei__zeile--markiert,
+.kartei__zeile--markiert:hover {
+  background: var(--akzent);
+  color: #fff;
+}
+
+.kartei__pfeil {
+  width: 14px;
+  flex: none;
+  text-align: center;
+  color: var(--text-leise);
+}
+
+.kartei__zeile--markiert .kartei__pfeil,
+.kartei__zeile--markiert .kartei__anzahl {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.kartei__zeilenname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kartei__faellig {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #3a9a5b;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kartei__anzahl {
+  min-width: 70px;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-leise);
+  font-variant-numeric: tabular-nums;
+}
+
+.kartei__aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px 6px;
+  border-top: 1px solid var(--linie);
+}
+
+.kartei__ende .kartei__aktionen {
+  border-top: 0;
+  padding-top: 8px;
+}
+
+.kartei__aktionen .knopf {
+  font-size: 14px;
+  padding: 8px 14px;
+}
+
+.kartei__aktionen .knopf:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.kartei__aktionen kbd {
+  margin-left: 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.kartei__hinweis--klein {
+  padding: 4px 22px 14px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.kartei__zurueck {
+  font-size: 20px;
+}
+
+.kartei__fortschritt {
+  height: 4px;
+  background: var(--code-bg);
+}
+
+.kartei__fortschritt div {
+  height: 100%;
+  background: #3a9a5b;
+  transition: width 0.25s;
+}
+
+.kartei__bewertung--frei {
+  grid-template-columns: repeat(2, 1fr);
 }
 
 /* Zahl fälliger Karten in der Ordner-Leiste */

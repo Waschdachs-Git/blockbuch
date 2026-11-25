@@ -20,6 +20,8 @@ pub struct Karte {
     pub ordner: String,
     pub datei: String,
     pub titel: String,
+    /// Titel des Karten-Kastens (`> [!karten] Protokolle` → "Protokolle"), sonst leer
+    pub gruppe: String,
 }
 
 /// Kennung einer Karte: FNV-1a über die Frage (Leerzeichen vereinheitlicht)
@@ -56,13 +58,21 @@ pub fn ohne_maskierung(text: &str) -> String {
 
 /// Karten aus dem Text einer Notiz: alle Zeilen in `> [!karten]`-Kästen mit "Frage :: Antwort"
 /// (auch als Liste "> - Frage :: Antwort" oder in einem Kasten im Kasten)
+#[cfg(test)]
 pub fn karten_aus_text(text: &str) -> Vec<(String, String)> {
+    karten_mit_gruppe(text).into_iter().map(|(_, f, a)| (f, a)).collect()
+}
+
+/// Wie karten_aus_text, dazu der Titel des Kastens (Gruppe): `> [!karten]- Protokolle` → "Protokolle"
+pub fn karten_mit_gruppe(text: &str) -> Vec<(String, String, String)> {
     let mut karten = Vec::new();
-    let mut im_kasten = false;
+    // offene Karten-Kästen (Tiefe = Anzahl ">", Titel); ein Kasten im Kasten endet, wenn die Zeilen
+    // wieder flacher werden – danach gilt wieder der Titel des äußeren
+    let mut kaesten: Vec<(usize, String)> = Vec::new();
     let mut im_code = false;
     for zeile in text.lines() {
         let t = zeile.trim_start();
-        if !im_kasten && (t.starts_with("```") || t.starts_with("~~~")) {
+        if kaesten.is_empty() && (t.starts_with("```") || t.starts_with("~~~")) {
             im_code = !im_code;
             continue;
         }
@@ -70,21 +80,32 @@ pub fn karten_aus_text(text: &str) -> Vec<(String, String)> {
             continue;
         }
         let Some(inhalt) = t.strip_prefix('>') else {
-            im_kasten = false;
+            kaesten.clear();
             continue;
         };
         // weitere ">" (Kasten im Kasten) und Listenzeichen ("- ", "* ", "1. ") am Anfang weglassen
         let mut inhalt = inhalt.trim();
+        let mut tiefe = 1;
         while let Some(r) = inhalt.strip_prefix('>') {
             inhalt = r.trim_start();
+            tiefe += 1;
+        }
+        while kaesten.last().is_some_and(|(k, _)| *k > tiefe) {
+            kaesten.pop();
         }
         if inhalt.to_lowercase().starts_with("[!karten]") {
-            im_kasten = true;
+            let rest = &inhalt["[!karten]".len()..];
+            let rest = rest.strip_prefix('-').or_else(|| rest.strip_prefix('+')).unwrap_or(rest);
+            // gleich tief: neuer Kasten ersetzt den vorigen
+            if kaesten.last().is_some_and(|(k, _)| *k == tiefe) {
+                kaesten.pop();
+            }
+            kaesten.push((tiefe, ohne_maskierung(rest.trim())));
             continue;
         }
-        if !im_kasten {
+        let Some((_, gruppe)) = kaesten.last() else {
             continue;
-        }
+        };
         let inhalt = inhalt
             .strip_prefix("- ")
             .or_else(|| inhalt.strip_prefix("* "))
@@ -97,7 +118,7 @@ pub fn karten_aus_text(text: &str) -> Vec<(String, String)> {
         if let Some((frage, antwort)) = inhalt.split_once("::") {
             let (frage, antwort) = (ohne_maskierung(frage.trim()), ohne_maskierung(antwort.trim()));
             if !frage.is_empty() && !antwort.is_empty() {
-                karten.push((frage, antwort));
+                karten.push((gruppe.clone(), frage, antwort));
             }
         }
     }
@@ -127,7 +148,7 @@ pub fn karten_sammeln(root: &Path, ordner: Option<&str>) -> Vec<Karte> {
         dateien.sort();
         for datei in dateien {
             let Ok(text) = fs::read_to_string(root.join(&o).join(&datei)) else { continue };
-            let karten = karten_aus_text(&text);
+            let karten = karten_mit_gruppe(&text);
             if karten.is_empty() {
                 continue;
             }
@@ -137,8 +158,8 @@ pub fn karten_sammeln(root: &Path, ordner: Option<&str>) -> Vec<Karte> {
                 .find_map(|z| z.strip_prefix("# "))
                 .map(|t| t.trim().to_string())
                 .unwrap_or_else(|| datei.trim_end_matches(".md").to_string());
-            for (frage, antwort) in karten {
-                alle.push(Karte { id: karten_id(&frage), frage, antwort, ordner: o.clone(), datei: datei.clone(), titel: titel.clone() });
+            for (gruppe, frage, antwort) in karten {
+                alle.push(Karte { id: karten_id(&frage), frage, antwort, ordner: o.clone(), datei: datei.clone(), titel: titel.clone(), gruppe });
             }
         }
     }
@@ -242,6 +263,17 @@ mod tests {
         );
         assert_eq!(karten_id("snake_case?"), karten_id(&ohne_maskierung("snake\\_case?")));
         assert_eq!(ohne_maskierung("C:\\\\Pfad \\ä"), "C:\\Pfad \\ä");
+    }
+
+    #[test]
+    fn gruppe_ist_der_kastentitel() {
+        let text = "> [!karten] Protokolle\n> TCP? :: verbindungsorientiert\n\n> [!karten]-  OSI\\_Modell \n> Schicht 3? :: Vermittlung\n\n> [!karten]\n> Ohne :: Titel\n";
+        let g: Vec<String> = karten_mit_gruppe(text).into_iter().map(|(g, _, _)| g).collect();
+        assert_eq!(g, vec!["Protokolle", "OSI_Modell", ""]);
+        // Kasten im Kasten: danach gilt wieder der äußere Titel
+        let text = "> [!karten] Außen\n> A :: 1\n> > [!karten] Innen\n> > B :: 2\n> C :: 3\n";
+        let g: Vec<(String, String)> = karten_mit_gruppe(text).into_iter().map(|(g, f, _)| (g, f)).collect();
+        assert_eq!(g, vec![("Außen".into(), "A".into()), ("Innen".into(), "B".into()), ("Außen".into(), "C".into())]);
     }
 
     #[test]

@@ -4,7 +4,7 @@ import { bewerten, type Lernstand } from "./planer";
 import { faelligAnzeige, faelligJeOrdner, sitzungErstellen } from "./sitzung";
 
 const JETZT = new Date(2026, 10, 24, 15, 0).getTime();
-const karte = (id: string, ordner = "LF5"): Karte => ({ id, frage: id, antwort: "a", ordner, datei: "x.md", titel: "X" });
+const karte = (id: string, ordner = "LF5"): Karte => ({ id, frage: id, antwort: "a", ordner, datei: "x.md", titel: "X", gruppe: "" });
 
 it("fällige Wiederholungen zuerst (am längsten überfällig vorn), dann neue, ohne Doppelte", () => {
   const lernstand: Lernstand = {
